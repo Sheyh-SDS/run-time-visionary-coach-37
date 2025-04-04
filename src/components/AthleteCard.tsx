@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Athlete } from '@/types';
@@ -22,28 +22,29 @@ const AthleteCard: React.FC<AthleteCardProps> = ({ athlete, onClick }) => {
 
   return (
     <Card 
-      className="hover:shadow-md transition-all cursor-pointer animate-fade-in"
+      className="hover:shadow-md transition-all cursor-pointer animate-fade-in border-l-4 border-l-primary"
       onClick={handleClick}
     >
-      <CardHeader className="pb-2">
+      <CardContent className="p-4">
         <div className="flex items-center space-x-4">
-          <Avatar className="h-12 w-12">
+          <Avatar className="h-12 w-12 border-2 border-primary/10">
             <AvatarImage src={athlete.imageUrl} alt={athlete.name} />
-            <AvatarFallback className="bg-primary text-primary-foreground">
+            <AvatarFallback className="bg-primary/10 text-primary font-medium">
               {initials}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <CardTitle className="text-lg">{athlete.name}</CardTitle>
-            <div className="text-sm text-muted-foreground">
-              {athlete.age} лет, {athlete.gender === 'male' ? 'муж' : athlete.gender === 'female' ? 'жен' : 'др'}
+          <div className="flex-1">
+            <div className="font-medium text-lg">{athlete.name}</div>
+            <div className="text-sm text-muted-foreground flex items-center space-x-2">
+              <span>{athlete.age} лет</span>
+              <span>•</span>
+              <span>{athlete.gender === 'male' ? 'Муж' : athlete.gender === 'female' ? 'Жен' : 'Др'}</span>
             </div>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-2">
-          <div className="text-sm font-medium mb-1">Специализация:</div>
+        
+        <div className="mt-3">
+          <div className="text-xs text-muted-foreground mb-1">Специализация:</div>
           <div className="flex flex-wrap gap-1">
             {athlete.specialization.map((spec) => (
               <Badge key={spec} variant="secondary" className="text-xs">
@@ -52,18 +53,16 @@ const AthleteCard: React.FC<AthleteCardProps> = ({ athlete, onClick }) => {
             ))}
           </div>
         </div>
-        <div>
-          <div className="text-sm font-medium mb-1">Лучшие результаты:</div>
-          <div className="grid grid-cols-2 gap-1 text-sm">
-            {Object.entries(athlete.personalBests)
-              .slice(0, 4)
-              .map(([event, time]) => (
-                <div key={event} className="flex justify-between">
-                  <span>{event}:</span>
-                  <span className="font-medium text-primary">{time}</span>
-                </div>
-              ))}
-          </div>
+        
+        <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+          {Object.entries(athlete.personalBests)
+            .slice(0, 4)
+            .map(([event, time]) => (
+              <div key={event} className="flex justify-between">
+                <span className="text-muted-foreground">{event}:</span>
+                <span className="font-medium text-primary">{time}</span>
+              </div>
+            ))}
         </div>
       </CardContent>
     </Card>

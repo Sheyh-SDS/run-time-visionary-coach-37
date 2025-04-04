@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 import AthleteList from '@/components/AthleteList';
 import PerformanceChart from '@/components/PerformanceChart';
 import ProbabilityChart from '@/components/ProbabilityChart';
@@ -42,11 +43,15 @@ const Athletes = () => {
                 <CardTitle>Поиск спортсменов</CardTitle>
               </CardHeader>
               <CardContent>
-                <Input 
-                  placeholder="Поиск по имени или специализации..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Поиск по имени или специализации..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
               </CardContent>
             </Card>
 
