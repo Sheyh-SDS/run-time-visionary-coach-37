@@ -4,8 +4,14 @@ import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
+import { 
+  LineChart, Line, BarChart, Bar, PieChart, Pie, 
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  Legend, Cell 
+} from 'recharts';
 import { mockAthletes, mockRunSessions, mockPerformanceMetrics, formatTime } from '@/data/mockData';
+import { RunSession } from '@/types';
 
 const Statistics = () => {
   const [selectedAthlete, setSelectedAthlete] = useState('all');
