@@ -19,8 +19,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full transition-colors duration-300">
-        {/* Desktop sidebar */}
-        <Sidebar />
+        {/* Desktop sidebar with collapsible functionality */}
+        {!isMobile && <Sidebar />}
         
         {/* Mobile sidebar */}
         {isMobile && <MobileSidebar />}

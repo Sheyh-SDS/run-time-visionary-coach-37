@@ -2,12 +2,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Activity, User, Calendar, LineChart, BarChart, Gauge } from 'lucide-react';
 
@@ -16,19 +16,19 @@ const MobileSidebar: React.FC = () => {
 
   return (
     <div className="fixed top-4 left-4 z-50 md:hidden">
-      <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerTrigger asChild>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
           <Button variant="outline" size="icon" aria-label="Open menu">
             <Menu className="h-5 w-5" />
           </Button>
-        </DrawerTrigger>
-        <DrawerContent className="h-[80vh]">
-          <DrawerHeader>
-            <DrawerTitle className="flex items-center space-x-2">
+        </SheetTrigger>
+        <SheetContent side="left" className="w-[270px] p-0">
+          <SheetHeader className="px-4 py-3 border-b">
+            <SheetTitle className="flex items-center space-x-2">
               <Activity className="h-6 w-6 text-primary" />
               <span className="text-lg font-semibold">RunCoach Pro</span>
-            </DrawerTitle>
-          </DrawerHeader>
+            </SheetTitle>
+          </SheetHeader>
           <div className="p-4 flex flex-col space-y-2">
             <div className="space-y-1">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase px-2 py-1">
@@ -45,7 +45,7 @@ const MobileSidebar: React.FC = () => {
                 </Link>
                 <Link 
                   to="/athletes" 
-                  className="flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-secondary w-full bg-secondary"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-secondary w-full"
                   onClick={() => setOpen(false)}
                 >
                   <User className="h-5 w-5" />
@@ -90,8 +90,8 @@ const MobileSidebar: React.FC = () => {
             <div>RunCoach Pro v1.0</div>
             <div>© 2025 Athletics Analytics</div>
           </div>
-        </DrawerContent>
-      </Drawer>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
