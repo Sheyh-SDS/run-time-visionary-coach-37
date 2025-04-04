@@ -4,6 +4,7 @@ import AthleteCard from './AthleteCard';
 import { Athlete } from '@/types';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface AthleteListProps {
   athletes: Athlete[];
@@ -11,6 +12,9 @@ interface AthleteListProps {
 }
 
 const AthleteList: React.FC<AthleteListProps> = ({ athletes, onSelectAthlete }) => {
+  const isMobile = useIsMobile();
+  const scrollHeight = isMobile ? "h-[60vh]" : "h-[500px]";
+
   if (athletes.length === 0) {
     return (
       <div className="text-center p-4 border border-dashed rounded-lg">
@@ -20,7 +24,7 @@ const AthleteList: React.FC<AthleteListProps> = ({ athletes, onSelectAthlete }) 
   }
 
   return (
-    <ScrollArea className="h-[500px] pr-4">
+    <ScrollArea className={`${scrollHeight} pr-4`}>
       <div className="space-y-3">
         {athletes.map((athlete) => (
           <AthleteCard
