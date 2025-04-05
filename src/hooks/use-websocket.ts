@@ -1,288 +1,124 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { webSocketService, WebSocketState, WebSocketMessage } from '@/services/websocket';
+import { useEffect, useRef, useState } from 'react';
+import { WebSocketService, WebSocketOptions, WebSocketState } from '@/services/websocket';
 
-interface UseWebSocketOptions {
-  url?: string;
-  reconnectOnMount?: boolean;
-  onMessage?: (message: WebSocketMessage) => void;
-  maxReconnectAttempts?: number;
-  reconnectInterval?: number;
-  token?: string;
-  debug?: boolean;
-  autoSubscribeChannels?: string[];
-  pingInterval?: number;
-}
-
-export function useWebSocket(options: UseWebSocketOptions = {}) {
+export function useWebSocket(options: WebSocketOptions) {
   const [connectionState, setConnectionState] = useState<WebSocketState>(
-    webSocketService.getState()
+    options.url && options.reconnectOnMount ? 'connecting' : 'closed'
   );
-  const [lastError, setLastError] = useState<{ code?: number; reason?: string; message?: string } | null>(null);
-  const [clientId, setClientId] = useState<string | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const reconnectTimerRef = useRef<number | null>(null);
-  const pingTimerRef = useRef<number | null>(null);
-  const {
-    maxReconnectAttempts = 5,
-    reconnectInterval = 3000,
-    onMessage,
-    token,
-    debug = false,
-    autoSubscribeChannels = [],
-    pingInterval = 25000
-  } = options;
+  const [isConnected, setIsConnected] = useState(false);
+  const webSocketRef = useRef<WebSocketService | null>(null);
 
   useEffect(() => {
-    let messageUnsubscribe: (() => void) | undefined;
-    
-    if (onMessage) {
-      messageUnsubscribe = webSocketService.on('*', (payload) => {
-        onMessage({ type: payload.type || 'unknown', payload: payload.payload });
-        
-        if (debug) {
-          console.log('WebSocket received message:', payload);
-        }
-      });
-    }
-    
+    // Custom handlers that update the component state
+    const handlers: WebSocketOptions = {
+      ...options,
+      onOpen: () => {
+        setConnectionState('open');
+        setIsConnected(true);
+        if (options.onOpen) options.onOpen();
+      },
+      onClose: () => {
+        setConnectionState('closed');
+        setIsConnected(false);
+        if (options.onClose) options.onClose();
+      },
+      onError: (error) => {
+        setConnectionState('error');
+        setIsConnected(false);
+        if (options.onError) options.onError(error);
+      }
+    };
+
+    // Create WebSocket service
+    webSocketRef.current = new WebSocketService(handlers);
+
+    // Cleanup on unmount
     return () => {
-      if (messageUnsubscribe) {
-        messageUnsubscribe();
+      if (webSocketRef.current) {
+        webSocketRef.current.disconnect();
+        webSocketRef.current = null;
       }
     };
-  }, [onMessage, debug]);
+  }, []);
 
-  useEffect(() => {
-    const setupPingInterval = () => {
-      if (pingInterval > 0 && connectionState === 'open') {
-        if (pingTimerRef.current) {
-          window.clearInterval(pingTimerRef.current);
-        }
-        
-        pingTimerRef.current = window.setInterval(() => {
-          if (debug) {
-            console.log('Sending ping to keep connection alive');
-          }
-          
-          webSocketService.send('ping', {});
-        }, pingInterval);
-        
-        if (debug) {
-          console.log(`Ping interval set to ${pingInterval}ms`);
-        }
-      }
-      return () => {
-        if (pingTimerRef.current) {
-          window.clearInterval(pingTimerRef.current);
-          pingTimerRef.current = null;
-        }
-      };
-    };
-    
-    return setupPingInterval();
-  }, [pingInterval, connectionState, debug]);
-
-  useEffect(() => {
-    const unsubscribeState = webSocketService.onStateChange((state, error) => {
-      setConnectionState(state);
-      
-      if (error) {
-        setLastError(error);
-        
-        if (debug) {
-          console.error('WebSocket error:', error);
-        }
-      } else {
-        setLastError(null);
-      }
-      
-      if (state === 'open') {
-        reconnectAttemptsRef.current = 0;
-        setClientId(webSocketService.getClientId());
-
-        if (token) {
-          webSocketService.send('connect', { token });
-          
-          if (debug) {
-            console.log('Sent authentication with token:', token);
-          }
-        }
-        
-        if (autoSubscribeChannels.length > 0 && state === 'open') {
-          autoSubscribeChannels.forEach(channel => {
-            webSocketService.subscribeToChannel(channel);
-            if (debug) {
-              console.log(`Auto-subscribed to channel: ${channel}`);
-            }
-          });
-        }
-      }
-      
-      if (state === 'error' || state === 'closed') {
-        attemptReconnect();
-      }
-    });
-
-    const attemptReconnect = () => {
-      if (reconnectTimerRef.current !== null) {
-        window.clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-      
-      if (reconnectAttemptsRef.current >= maxReconnectAttempts || !options.url) {
-        if (debug) {
-          console.log(`Max reconnect attempts (${maxReconnectAttempts}) reached or no URL provided.`);
-        }
-        return;
-      }
-      
-      const delay = reconnectInterval * Math.pow(1.5, reconnectAttemptsRef.current);
-      
-      if (debug) {
-        console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})...`);
-      }
-      
-      reconnectTimerRef.current = window.setTimeout(() => {
-        reconnectAttemptsRef.current += 1;
-        if (options.url) {
-          if (debug) {
-            console.log(`Reconnecting to ${options.url}...`);
-          }
-          webSocketService.connect(options.url);
-        }
-      }, delay);
-    };
-
-    if (options.url && options.reconnectOnMount) {
-      webSocketService.connect(options.url);
-    }
-
-    return () => {
-      unsubscribeState();
-      if (reconnectTimerRef.current !== null) {
-        window.clearTimeout(reconnectTimerRef.current);
-      }
-      if (pingTimerRef.current !== null) {
-        window.clearInterval(pingTimerRef.current);
-      }
-    };
-  }, [options.url, options.reconnectOnMount, token, maxReconnectAttempts, reconnectInterval, debug, autoSubscribeChannels]);
-
-  const sendMessage = useCallback((type: string, payload: any): boolean => {
-    const result = webSocketService.send(type, payload);
-    if (debug && !result) {
-      console.error(`Failed to send message of type ${type}`);
-    }
-    return result;
-  }, [debug]);
-
-  const sendRawMessage = useCallback((message: string): boolean => {
-    const result = webSocketService.sendRaw(message);
-    if (debug && !result) {
-      console.error('Failed to send raw message');
-    }
-    return result;
-  }, [debug]);
-
-  const sendCentrifugoCommand = useCallback((method: string, params: any, id?: number): boolean => {
-    if (!webSocketService.socket || webSocketService.socket.readyState !== WebSocket.OPEN) {
-      if (debug) {
-        console.error('Cannot send Centrifugo command, WebSocket is not connected');
-      }
-      return false;
-    }
-
-    try {
-      const commandId = id || Math.floor(Math.random() * 1000) + 1;
-      const command = {
-        id: commandId,
-        method,
-        params
-      };
-
-      webSocketService.socket.send(JSON.stringify(command));
-      
-      if (debug) {
-        console.log(`Sent Centrifugo command:`, command);
-      }
-      
-      return true;
-    } catch (error) {
-      if (debug) {
-        console.error('Error sending Centrifugo command:', error);
-      }
-      return false;
-    }
-  }, [debug]);
-
-  const centrifugo = {
-    connect: (connectToken: string = token || '') => {
-      return sendCentrifugoCommand('connect', { token: connectToken }, 1);
-    },
-    subscribe: (channelName: string) => {
-      return sendCentrifugoCommand('subscribe', { channel: channelName });
-    },
-    unsubscribe: (channelName: string) => {
-      return sendCentrifugoCommand('unsubscribe', { channel: channelName });
-    },
-    publish: (channelName: string, data: any) => {
-      return sendCentrifugoCommand('publish', { channel: channelName, data });
-    },
-    presence: (channelName: string) => {
-      return sendCentrifugoCommand('presence', { channel: channelName });
-    },
-    history: (channelName: string) => {
-      return sendCentrifugoCommand('history', { channel: channelName });
-    },
-    ping: () => {
-      return sendCentrifugoCommand('ping', {});
+  /**
+   * Connect to a WebSocket server
+   * @param url The WebSocket server URL
+   */
+  const connect = (url: string) => {
+    if (webSocketRef.current) {
+      webSocketRef.current.connect(url);
+      setConnectionState('connecting');
     }
   };
 
-  const onMessageType = useCallback((type: string, handler: (payload: any) => void): () => void => {
-    return webSocketService.on(type, handler);
-  }, []);
+  /**
+   * Disconnect from the WebSocket server
+   */
+  const disconnect = () => {
+    if (webSocketRef.current) {
+      webSocketRef.current.disconnect();
+      setConnectionState('closed');
+      setIsConnected(false);
+    }
+  };
 
-  const connect = useCallback((url?: string) => {
-    if (url || options.url) {
-      reconnectAttemptsRef.current = 0;
-      setLastError(null);
-      webSocketService.connect(url || options.url || '');
-    } else {
-      console.error('No WebSocket URL provided');
+  /**
+   * Subscribe to a channel
+   * @param channel The channel to subscribe to
+   * @param callback Optional callback function for messages on this channel
+   */
+  const subscribe = (channel: string, callback?: (data: any) => void) => {
+    if (webSocketRef.current) {
+      webSocketRef.current.subscribe(channel, callback);
     }
-  }, [options.url]);
+  };
 
-  const disconnect = useCallback(() => {
-    if (reconnectTimerRef.current !== null) {
-      window.clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
+  /**
+   * Unsubscribe from a channel
+   * @param channel The channel to unsubscribe from
+   */
+  const unsubscribe = (channel: string) => {
+    if (webSocketRef.current) {
+      webSocketRef.current.unsubscribe(channel);
     }
-    
-    if (pingTimerRef.current !== null) {
-      window.clearInterval(pingTimerRef.current);
-      pingTimerRef.current = null;
+  };
+
+  /**
+   * Publish a message to a channel
+   * @param channel The channel to publish to
+   * @param data The data to publish
+   */
+  const publish = (channel: string, data: any) => {
+    if (webSocketRef.current) {
+      webSocketRef.current.publish(channel, data);
     }
-    
-    webSocketService.disconnect();
-    setClientId(null);
-  }, []);
+  };
+
+  /**
+   * Get the current connection state
+   */
+  const getState = (): WebSocketState => {
+    return webSocketRef.current?.state || 'closed';
+  };
+
+  /**
+   * Get the connection ID
+   */
+  const getConnectionId = (): string | null => {
+    return webSocketRef.current?.getConnectionId() || null;
+  };
 
   return {
     connectionState,
-    isConnected: connectionState === 'open',
-    isConnecting: connectionState === 'connecting',
-    lastError,
-    clientId,
-    sendMessage,
-    sendRawMessage,
-    onMessage: onMessageType,
+    isConnected,
     connect,
     disconnect,
-    centrifugo,
-    subscribe: useCallback((channel: string) => webSocketService.subscribeToChannel(channel), []),
-    unsubscribe: useCallback((channel: string) => webSocketService.unsubscribeFromChannel(channel), []),
-    publish: useCallback((channel: string, data: any) => webSocketService.publishToChannel(channel, data), [])
+    subscribe,
+    unsubscribe,
+    publish,
+    getState,
+    getConnectionId
   };
 }

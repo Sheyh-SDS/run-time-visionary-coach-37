@@ -1,844 +1,427 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { toast } from "@/hooks/use-toast";
-import { Loader2, Send, PlayCircle, StopCircle, X, Info, AlertCircle, Code, Download, Copy, RefreshCw } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { useWebSocket } from "@/hooks/use-websocket";
-import { Toggle } from "@/components/ui/toggle";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useWebSocket } from '@/hooks/use-websocket';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Wifi, WifiOff, Send, Plus, Trash, RefreshCw, Check } from 'lucide-react';
+import { simulationApi } from '@/services/simulationApi';
 
 const WebSocketTest: React.FC = () => {
-  // WebSocket hook
-  const [url, setUrl] = useState('wss://intricately-tenacious-mantis.cloudpub.ru/ws/connection/websocket');
-  const [token, setToken] = useState('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SB4MqSE0zFQHWYumo3NGLN11X6pLQkNNhvAqmh6Wtew');
-  const [channel, setChannel] = useState('news');
-  const [logs, setLogs] = useState<string[]>([]);
-  const [message, setMessage] = useState('');
-  const [activeTab, setActiveTab] = useState('simple');
-  const [rawMessage, setRawMessage] = useState('');
-  const [cmdMethod, setCmdMethod] = useState('subscribe');
-  const [cmdParams, setCmdParams] = useState('');
-  const [debugMode, setDebugMode] = useState(true);
-  const [autoSubscribe, setAutoSubscribe] = useState(false);
-  const logsEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const [serverUrl, setServerUrl] = useState('wss://centrifugo.example.com/connection/websocket');
+  const [channelName, setChannelName] = useState('test');
+  const [messageText, setMessageText] = useState('');
+  const [receivedMessages, setReceivedMessages] = useState<{channel: string, data: any, time: string}[]>([]);
+  const [activeSubscriptions, setActiveSubscriptions] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState('connect');
 
-  // Use the WebSocket hook
+  const handleMessage = (message: any) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setReceivedMessages(prev => [...prev, {
+      channel: message.channel || 'unknown',
+      data: message,
+      time: timestamp
+    }]);
+  };
+
   const { 
     connectionState, 
-    isConnected,
-    isConnecting,
-    lastError,
-    clientId,
-    connect,
-    disconnect,
-    sendRawMessage,
-    centrifugo
+    isConnected, 
+    connect, 
+    disconnect, 
+    subscribe, 
+    unsubscribe, 
+    publish,
+    getConnectionId
   } = useWebSocket({
-    debug: debugMode,
-    autoSubscribeChannels: autoSubscribe ? [channel] : [],
+    url: undefined, // We'll connect manually
+    onMessage: handleMessage,
+    onOpen: () => {
+      toast({
+        title: "Подключено к серверу",
+        description: `Соединение установлено с ID: ${getConnectionId()}`,
+      });
+      setActiveTab('subscribe');
+    },
+    onClose: () => {
+      toast({
+        title: "Соединение закрыто",
+        description: "Соединение с сервером было закрыто."
+      });
+      setActiveSubscriptions([]);
+    },
+    onError: () => {
+      toast({
+        title: "Ошибка соединения",
+        description: "Не удалось подключиться к серверу.",
+        variant: "destructive"
+      });
+    }
   });
 
-  // Add log entry with timestamp
-  const addLog = (message: string, isError = false) => {
-    const timestamp = new Date().toLocaleTimeString();
-    const logMessage = `[${timestamp}] ${message}`;
-    setLogs(prevLogs => [...prevLogs, logMessage]);
-    
-    if (isError) {
-      console.error(logMessage);
-    }
-  };
-
-  // Auto-scroll to bottom of logs
-  useEffect(() => {
-    if (logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs]);
-
-  // Log WebSocket state changes
-  useEffect(() => {
-    switch (connectionState) {
-      case 'connecting':
-        addLog('Connecting to WebSocket...');
-        break;
-      case 'open':
-        addLog('WebSocket connection established');
-        break;
-      case 'closed':
-        addLog(`WebSocket connection closed${lastError ? `: code=${lastError.code}, reason=${lastError.reason}` : ''}`);
-        break;
-      case 'error':
-        // Fixed here: checking if lastError exists before accessing message
-        addLog(`WebSocket error: ${lastError ? (lastError.reason || 'Unknown error') : 'Unknown error'}`, true);
-        break;
-    }
-  }, [connectionState, lastError]);
-
-  // Log client ID when it changes
-  useEffect(() => {
-    if (clientId) {
-      addLog(`Client ID received: ${clientId}`);
-    }
-  }, [clientId]);
-
-  const clearLogs = () => {
-    setLogs([]);
-  };
-
-  const connectWebSocket = () => {
-    if (!url) {
-      addLog("WebSocket URL is required", true);
+  // Handle connection
+  const handleConnect = () => {
+    if (!serverUrl) {
       toast({
-        title: "Error",
-        description: "WebSocket URL is required",
+        title: "Ошибка",
+        description: "Введите URL сервера Centrifugo",
+        variant: "destructive"
+      });
+      return;
+    }
+    connect(serverUrl);
+  };
+
+  // Handle disconnection
+  const handleDisconnect = () => {
+    disconnect();
+    setActiveSubscriptions([]);
+  };
+
+  // Handle subscription
+  const handleSubscribe = () => {
+    if (!channelName) {
+      toast({
+        title: "Ошибка",
+        description: "Введите имя канала",
         variant: "destructive"
       });
       return;
     }
 
-    connect(url);
-  };
-
-  const sendAuthentication = () => {
-    if (!isConnected) {
-      addLog("WebSocket is not connected", true);
-      return;
-    }
-
-    if (!token) {
-      addLog("Authentication token is required", true);
-      return;
-    }
-
-    centrifugo.connect(token);
-    addLog(`Sent authentication with token: ${token}`);
-  };
-
-  const disconnectWebSocket = () => {
-    disconnect();
-    addLog("WebSocket disconnected");
-  };
-
-  const subscribeToChannel = () => {
-    if (!isConnected) {
-      addLog("WebSocket is not connected", true);
-      return;
-    }
-
-    if (!channel) {
-      addLog("Channel name is required", true);
-      return;
-    }
-
-    centrifugo.subscribe(channel);
-    addLog(`Subscribing to channel: ${channel}`);
-  };
-
-  const sendMessage = () => {
-    if (!isConnected) {
-      addLog("WebSocket is not connected", true);
-      return;
-    }
-
-    // Based on which tab is active, send the appropriate message
-    if (activeTab === 'simple') {
-      if (!message) {
-        addLog("Message is empty", true);
-        return;
-      }
-
-      try {
-        // Try to parse the message as JSON
-        const jsonMessage = JSON.parse(message);
-        sendRawMessage(JSON.stringify(jsonMessage));
-        addLog(`Sent: ${JSON.stringify(jsonMessage, null, 2)}`);
-      } catch (e) {
-        // If parsing fails, send as plain text
-        sendRawMessage(message);
-        addLog(`Sent raw message: ${message}`);
-      }
-
-      setMessage('');
-    } else if (activeTab === 'raw') {
-      if (!rawMessage) {
-        addLog("Raw message is empty", true);
-        return;
-      }
-
-      try {
-        sendRawMessage(rawMessage);
-        addLog(`Sent raw message: ${rawMessage}`);
-      } catch (e) {
-        addLog(`Error sending message: ${e}`, true);
-      }
-    } else if (activeTab === 'command') {
-      if (!cmdMethod) {
-        addLog("Command method is required", true);
-        return;
-      }
-
-      try {
-        // Parse params if provided
-        let params: Record<string, any> = {};
-        if (cmdParams) {
-          try {
-            params = JSON.parse(cmdParams);
-          } catch (e) {
-            addLog(`Invalid JSON in parameters: ${e}`, true);
-            return;
-          }
-        }
-
-        // Add channel to params for certain methods
-        if (['subscribe', 'unsubscribe', 'publish', 'presence', 'history'].includes(cmdMethod) && !params.channel) {
-          params = { ...params, channel };
-        }
-
-        // Fixed: Type-safe method calling
-        switch(cmdMethod) {
-          case 'connect':
-            centrifugo.connect(params.token || token);
-            break;
-          case 'subscribe':
-            centrifugo.subscribe(params.channel);
-            break;
-          case 'unsubscribe':
-            centrifugo.unsubscribe(params.channel);
-            break;
-          case 'publish':
-            centrifugo.publish(params.channel, params.data || {});
-            break;
-          case 'presence':
-            centrifugo.presence(params.channel);
-            break;
-          case 'history':
-            centrifugo.history(params.channel);
-            break;
-          case 'ping':
-            centrifugo.ping();
-            break;
-        }
-        
-        addLog(`Sent ${cmdMethod} command with params: ${JSON.stringify(params)}`);
-      } catch (e) {
-        addLog(`Error sending command: ${e}`, true);
-      }
-    }
-  };
-
-  const sendPing = () => {
-    if (!isConnected) {
-      addLog("WebSocket is not connected", true);
-      return;
-    }
-    
-    centrifugo.ping();
-    addLog("Sent ping command");
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
+    if (activeSubscriptions.includes(channelName)) {
       toast({
-        title: "Copied",
-        description: "Text copied to clipboard",
+        title: "Канал уже подписан",
+        description: `Вы уже подписаны на канал ${channelName}`,
       });
+      return;
+    }
+
+    subscribe(channelName, (data) => {
+      const timestamp = new Date().toLocaleTimeString();
+      setReceivedMessages(prev => [...prev, {
+        channel: channelName,
+        data,
+        time: timestamp
+      }]);
+    });
+
+    setActiveSubscriptions(prev => [...prev, channelName]);
+    setChannelName('');
+    toast({
+      title: "Подписка оформлена",
+      description: `Вы подписались на канал ${channelName}`,
     });
   };
 
-  // Sample messages for common operations
-  const getSampleMessage = (type: string) => {
-    switch (type) {
-      case 'connect':
-        return JSON.stringify({
-          id: 1,
-          method: "connect",
-          params: {
-            token: token || "JWT_TOKEN_HERE"
-          }
-        }, null, 2);
-      case 'subscribe':
-        return JSON.stringify({
-          id: 2,
-          method: "subscribe",
-          params: {
-            channel: channel || "CHANNEL_NAME"
-          }
-        }, null, 2);
-      case 'publish':
-        return JSON.stringify({
-          id: 3,
-          method: "publish",
-          params: {
-            channel: channel || "CHANNEL_NAME",
-            data: {
-              text: "Hello from WebSocket test!"
-            }
-          }
-        }, null, 2);
-      case 'unsubscribe':
-        return JSON.stringify({
-          id: 4,
-          method: "unsubscribe",
-          params: {
-            channel: channel || "CHANNEL_NAME"
-          }
-        }, null, 2);
-      case 'presence':
-        return JSON.stringify({
-          id: 5,
-          method: "presence",
-          params: {
-            channel: channel || "CHANNEL_NAME"
-          }
-        }, null, 2);
-      case 'history':
-        return JSON.stringify({
-          id: 6,
-          method: "history",
-          params: {
-            channel: channel || "CHANNEL_NAME"
-          }
-        }, null, 2);
-      case 'ping':
-        return JSON.stringify({
-          id: 7,
-          method: "ping",
-          params: {}
-        }, null, 2);
-      default:
-        return "";
+  // Handle unsubscription
+  const handleUnsubscribe = (channel: string) => {
+    unsubscribe(channel);
+    setActiveSubscriptions(prev => prev.filter(sub => sub !== channel));
+    toast({
+      title: "Подписка отменена",
+      description: `Вы отписались от канала ${channel}`,
+    });
+  };
+
+  // Handle message publishing
+  const handlePublish = () => {
+    if (!activeSubscriptions.length) {
+      toast({
+        title: "Нет активных подписок",
+        description: "Подпишитесь на канал перед отправкой сообщения",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const messageData = messageText.trim() 
+        ? JSON.parse(messageText) 
+        : { text: "Test message", timestamp: new Date().toISOString() };
+      
+      publish(activeSubscriptions[0], messageData);
+      setMessageText('');
+      toast({
+        title: "Сообщение отправлено",
+        description: `Сообщение отправлено в канал ${activeSubscriptions[0]}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Ошибка JSON",
+        description: "Проверьте формат сообщения. Требуется валидный JSON.",
+        variant: "destructive"
+      });
     }
   };
 
-  const copyToInput = (template: string) => {
-    if (activeTab === 'simple') {
-      setMessage(template);
-    } else if (activeTab === 'raw') {
-      setRawMessage(template);
+  // Subscribe to default channels when connected to simulation channels
+  const handleSubscribeToSimulationChannels = () => {
+    const channels = simulationApi.getChannels();
+    Object.values(channels).forEach(channel => {
+      if (!activeSubscriptions.includes(channel)) {
+        subscribe(channel);
+        setActiveSubscriptions(prev => [...prev, channel]);
+      }
+    });
+    
+    toast({
+      title: "Подписка на каналы симуляции",
+      description: "Вы подписались на все каналы симуляции",
+    });
+  };
+
+  // Clear message history
+  const clearMessages = () => {
+    setReceivedMessages([]);
+  };
+
+  // Generate connection info
+  const connectionInfo = () => {
+    if (connectionState === 'open') {
+      return {
+        icon: <Wifi className="h-5 w-5 text-green-500" />,
+        label: "Подключено",
+        description: `ID соединения: ${getConnectionId() || 'неизвестно'}`
+      };
+    } else if (connectionState === 'connecting') {
+      return {
+        icon: <Wifi className="h-5 w-5 text-amber-500 animate-pulse" />,
+        label: "Подключение...",
+        description: "Установка соединения с сервером"
+      };
+    } else if (connectionState === 'error') {
+      return {
+        icon: <WifiOff className="h-5 w-5 text-red-500" />,
+        label: "Ошибка подключения",
+        description: "Не удалось подключиться к серверу"
+      };
+    } else {
+      return {
+        icon: <WifiOff className="h-5 w-5 text-muted-foreground" />,
+        label: "Отключено",
+        description: "Соединение не установлено"
+      };
     }
   };
 
-  // Clean up WebSocket connection on unmount
-  useEffect(() => {
-    return () => {
-      disconnect();
-    };
-  }, [disconnect]);
-
-  // Function to save logs to file
-  const saveLogsToFile = () => {
-    const logText = logs.join('\n');
-    const blob = new Blob([logText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `websocket-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  const info = connectionInfo();
 
   return (
     <Layout>
-      <div className="container mx-auto py-4">
-        <h1 className="text-2xl font-bold mb-6">WebSocket Connection Test</h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Connection Settings</CardTitle>
-              <CardDescription>Configure your WebSocket connection parameters</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="wsUrl">WebSocket URL</Label>
-                <div className="flex space-x-2">
-                  <Input 
-                    id="wsUrl" 
-                    value={url} 
-                    onChange={(e) => setUrl(e.target.value)}
-                    disabled={isConnected || isConnecting}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard(url)}
-                    title="Copy URL"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="token">Authentication Token</Label>
-                <div className="flex space-x-2">
-                  <Input 
-                    id="token" 
-                    value={token} 
-                    onChange={(e) => setToken(e.target.value)}
-                    disabled={isConnected}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard(token)}
-                    title="Copy Token"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="channel">Channel Name</Label>
-                <Input 
-                  id="channel" 
-                  value={channel} 
-                  onChange={(e) => setChannel(e.target.value)}
-                  placeholder="Enter channel to subscribe"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between space-x-2 pt-2">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="debug-mode"
-                    checked={debugMode}
-                    onCheckedChange={setDebugMode}
-                  />
-                  <Label htmlFor="debug-mode">Debug Mode</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="auto-subscribe"
-                    checked={autoSubscribe}
-                    onCheckedChange={setAutoSubscribe}
-                    disabled={isConnected}
-                  />
-                  <Label htmlFor="auto-subscribe">Auto-subscribe</Label>
-                </div>
-              </div>
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold tracking-tight">Centrifugo WebSocket Test</h1>
+        <p className="text-muted-foreground">
+          Тестирование соединения с Centrifugo и обмена сообщениями по WebSocket
+        </p>
 
-              {lastError && (
-                <Alert variant="destructive" className="mt-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Connection Error</AlertTitle>
-                  <AlertDescription>
-                    <p>Code: {lastError.code}</p>
-                    <p>Reason: {lastError.reason || 'No reason provided'}</p>
-                    {lastError.code === 3501 && (
-                      <p className="mt-2">
-                        Error 3501 (Bad Request) usually indicates an issue with the connection parameters or token format. 
-                        Try a different token or check if the server expects a specific format.
-                      </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-1 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {info.icon}
+                  <span>{info.label}</span>
+                </CardTitle>
+                <CardDescription>{info.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="grid grid-cols-3 mb-4">
+                    <TabsTrigger value="connect">Соединение</TabsTrigger>
+                    <TabsTrigger value="subscribe" disabled={!isConnected}>Подписки</TabsTrigger>
+                    <TabsTrigger value="publish" disabled={!isConnected || !activeSubscriptions.length}>Сообщения</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="connect" className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="server-url">URL сервера Centrifugo</Label>
+                      <Input
+                        id="server-url"
+                        value={serverUrl}
+                        onChange={(e) => setServerUrl(e.target.value)}
+                        placeholder="wss://centrifugo.example.com/connection/websocket"
+                        disabled={isConnected}
+                      />
+                    </div>
+                    
+                    {isConnected ? (
+                      <Button 
+                        variant="destructive" 
+                        className="w-full" 
+                        onClick={handleDisconnect}
+                      >
+                        <WifiOff className="mr-2 h-4 w-4" />
+                        Отключиться
+                      </Button>
+                    ) : (
+                      <Button 
+                        className="w-full" 
+                        onClick={handleConnect}
+                        disabled={connectionState === 'connecting'}
+                      >
+                        {connectionState === 'connecting' ? (
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Wifi className="mr-2 h-4 w-4" />
+                        )}
+                        Подключиться
+                      </Button>
                     )}
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              {clientId && (
-                <Alert className="mt-4">
-                  <Info className="h-4 w-4" />
-                  <AlertTitle>Connection Info</AlertTitle>
-                  <AlertDescription>
-                    <p>Client ID: {clientId}</p>
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-            <CardFooter className="flex flex-wrap gap-2">
-              {!isConnected ? (
-                <Button 
-                  onClick={connectWebSocket} 
-                  disabled={isConnecting || isConnected}
-                >
-                  {isConnecting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Connecting...
-                    </>
-                  ) : (
-                    <>
-                      <PlayCircle className="mr-2 h-4 w-4" />
-                      Connect
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <Button 
-                  onClick={disconnectWebSocket} 
-                  variant="destructive"
-                >
-                  <StopCircle className="mr-2 h-4 w-4" />
-                  Disconnect
-                </Button>
-              )}
-              
-              <Button 
-                onClick={sendAuthentication}
-                disabled={!isConnected || !token}
-                variant="secondary"
-              >
-                Authenticate
-              </Button>
-              
-              <Button 
-                onClick={subscribeToChannel}
-                disabled={!isConnected || !channel}
-                variant="outline"
-              >
-                Subscribe
-              </Button>
-              
-              <Button 
-                onClick={sendPing}
-                disabled={!isConnected}
-                variant="outline"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Ping
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex justify-between items-center">
-                <span>WebSocket Logs</span>
-                <Badge variant={isConnected ? "default" : "secondary"}>
-                  {connectionState.charAt(0).toUpperCase() + connectionState.slice(1)}
-                </Badge>
-              </CardTitle>
-              <CardDescription className="flex justify-between items-center">
-                <span>Real-time connection events</span>
-                <div className="flex space-x-2">
+                  </TabsContent>
+                  
+                  <TabsContent value="subscribe" className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="channel-name">Имя канала</Label>
+                      <div className="flex space-x-2">
+                        <Input
+                          id="channel-name"
+                          value={channelName}
+                          onChange={(e) => setChannelName(e.target.value)}
+                          placeholder="Введите имя канала"
+                        />
+                        <Button 
+                          onClick={handleSubscribe}
+                          disabled={!channelName}
+                          size="icon"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Активные подписки</Label>
+                      {activeSubscriptions.length > 0 ? (
+                        <div className="space-y-2">
+                          {activeSubscriptions.map((channel) => (
+                            <div key={channel} className="flex justify-between items-center p-2 bg-secondary rounded-md">
+                              <span className="text-sm">{channel}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleUnsubscribe(channel)}
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground text-center p-2">
+                          Нет активных подписок
+                        </div>
+                      )}
+                    </div>
+                    
+                    <Button 
+                      variant="outline" 
+                      className="w-full mt-2"
+                      onClick={handleSubscribeToSimulationChannels}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Подписаться на каналы симуляции
+                    </Button>
+                  </TabsContent>
+                  
+                  <TabsContent value="publish" className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <Label htmlFor="message-text">Сообщение (JSON)</Label>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setMessageText(JSON.stringify({ text: "Hello world", timestamp: new Date().toISOString() }, null, 2))}
+                        >
+                          Пример
+                        </Button>
+                      </div>
+                      <Textarea
+                        id="message-text"
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        placeholder='{"text": "Hello world"}'
+                        className="font-mono text-sm h-32"
+                      />
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm">
+                        Отправить в канал: 
+                        <Badge variant="outline" className="ml-2">
+                          {activeSubscriptions[0] || 'нет канала'}
+                        </Badge>
+                      </div>
+                      <Button onClick={handlePublish} disabled={!activeSubscriptions.length}>
+                        <Send className="mr-2 h-4 w-4" />
+                        Отправить
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="md:col-span-2">
+            <Card className="h-full flex flex-col">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Полученные сообщения</CardTitle>
                   <Button 
                     variant="ghost" 
-                    size="sm" 
-                    onClick={saveLogsToFile}
-                    className="h-8"
-                    title="Download logs"
+                    size="sm"
+                    onClick={clearMessages}
                   >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={clearLogs}
-                    className="h-8"
-                    title="Clear logs"
-                  >
-                    <X className="h-4 w-4" />
+                    <Trash className="mr-2 h-4 w-4" />
+                    Очистить
                   </Button>
                 </div>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-64 rounded border p-2 bg-secondary/20">
-                {logs.length === 0 ? (
-                  <div className="text-center text-muted-foreground p-4">
-                    No logs yet. Connect to WebSocket to see events.
-                  </div>
-                ) : (
-                  <div className="space-y-1 font-mono text-sm">
-                    {logs.map((log, index) => (
-                      <div key={index} className={`pb-1 ${log.includes('error') || log.includes('Error') ? 'text-destructive' : ''}`}>
-                        {log}
+              </CardHeader>
+              <CardContent className="flex-grow overflow-auto">
+                {receivedMessages.length > 0 ? (
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                    {receivedMessages.map((msg, idx) => (
+                      <div key={idx} className="p-3 bg-secondary rounded-md">
+                        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                          <div>Канал: <Badge variant="outline">{msg.channel}</Badge></div>
+                          <div>{msg.time}</div>
+                        </div>
+                        <pre className="text-xs font-mono overflow-x-auto p-2 bg-background rounded">
+                          {JSON.stringify(msg.data, null, 2)}
+                        </pre>
                       </div>
                     ))}
-                    <div ref={logsEndRef} />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+                    <p>Нет полученных сообщений</p>
+                    <p className="text-sm mt-2">Подпишитесь на канал для получения сообщений</p>
                   </div>
                 )}
-              </ScrollArea>
-            </CardContent>
-            <CardFooter className="flex-col">
-              <Tabs defaultValue="simple" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-3 mb-4">
-                  <TabsTrigger value="simple">JSON Message</TabsTrigger>
-                  <TabsTrigger value="command">Centrifugo Command</TabsTrigger>
-                  <TabsTrigger value="raw">Raw Message</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="simple" className="w-full">
-                  <div className="w-full space-y-4">
-                    <Textarea 
-                      value={message} 
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder="Enter JSON message to send"
-                      className="font-mono text-sm"
-                      disabled={!isConnected}
-                      rows={5}
-                    />
-                    
-                    <div className="flex flex-wrap gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => copyToInput(getSampleMessage('connect'))}
-                      >
-                        Connect
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => copyToInput(getSampleMessage('subscribe'))}
-                      >
-                        Subscribe
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => copyToInput(getSampleMessage('publish'))}
-                      >
-                        Publish
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => copyToInput(getSampleMessage('unsubscribe'))}
-                      >
-                        Unsubscribe
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => copyToInput(getSampleMessage('ping'))}
-                      >
-                        Ping
-                      </Button>
-                      
-                      <div className="grow"></div>
-                      
-                      <Button 
-                        onClick={sendMessage}
-                        disabled={!isConnected || !message}
-                      >
-                        <Send className="h-4 w-4 mr-2" /> Send
-                      </Button>
+              </CardContent>
+              <CardFooter className="border-t pt-4">
+                <div className="w-full flex justify-between items-center text-sm text-muted-foreground">
+                  <div>Всего сообщений: {receivedMessages.length}</div>
+                  {isConnected && (
+                    <div className="flex items-center">
+                      <Check className="h-4 w-4 text-green-500 mr-1" />
+                      Соединение активно
                     </div>
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="command" className="w-full">
-                  <div className="w-full space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="cmdMethod">Command Method</Label>
-                        <Select value={cmdMethod} onValueChange={setCmdMethod}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select method" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="connect">connect</SelectItem>
-                            <SelectItem value="subscribe">subscribe</SelectItem>
-                            <SelectItem value="unsubscribe">unsubscribe</SelectItem>
-                            <SelectItem value="publish">publish</SelectItem>
-                            <SelectItem value="presence">presence</SelectItem>
-                            <SelectItem value="history">history</SelectItem>
-                            <SelectItem value="ping">ping</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="cmdParams">Parameters (Optional JSON)</Label>
-                        <Textarea 
-                          id="cmdParams"
-                          value={cmdParams}
-                          onChange={(e) => setCmdParams(e.target.value)}
-                          placeholder='{"key": "value"}'
-                          className="font-mono text-sm"
-                          rows={4}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button 
-                        onClick={sendMessage}
-                        disabled={!isConnected}
-                      >
-                        <Send className="h-4 w-4 mr-2" /> Send Command
-                      </Button>
-                    </div>
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="raw" className="w-full">
-                  <div className="w-full space-y-4">
-                    <Textarea 
-                      value={rawMessage} 
-                      onChange={(e) => setRawMessage(e.target.value)}
-                      placeholder="Enter raw message to send"
-                      className="font-mono text-sm"
-                      disabled={!isConnected}
-                      rows={5}
-                    />
-                    
-                    <div className="flex flex-wrap gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => copyToInput(getSampleMessage('connect'))}
-                      >
-                        Connect
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => copyToInput(getSampleMessage('subscribe'))}
-                      >
-                        Subscribe
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => copyToInput(getSampleMessage('publish'))}
-                      >
-                        Publish
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => copyToInput(getSampleMessage('ping'))}
-                      >
-                        Ping
-                      </Button>
-                      
-                      <div className="grow"></div>
-                      
-                      <Button 
-                        onClick={sendMessage}
-                        disabled={!isConnected || !rawMessage}
-                      >
-                        <Send className="h-4 w-4 mr-2" /> Send Raw
-                      </Button>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardFooter>
-          </Card>
+                  )}
+                </div>
+              </CardFooter>
+            </Card>
+          </div>
         </div>
-        
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Info className="h-5 w-5 mr-2" />
-              Centrifugo WebSocket Protocol Reference
-            </CardTitle>
-            <CardDescription>
-              Documentation for standard Centrifugo WebSocket protocol commands and troubleshooting
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium mb-2">Common Error Codes</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Alert>
-                    <AlertTitle>Error 3501 (Bad Request)</AlertTitle>
-                    <AlertDescription>
-                      This typically means the connection parameters or token format are incorrect. Ensure your token is properly formatted and has the required claims.
-                    </AlertDescription>
-                  </Alert>
-                  
-                  <Alert>
-                    <AlertTitle>Error 1006 (Abnormal Close)</AlertTitle>
-                    <AlertDescription>
-                      The connection was closed abnormally, without proper closing handshake. This often indicates network problems or server issues.
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-md font-medium mb-2">Connect Command</h3>
-                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
-                    {`{
-  "id": 1,
-  "method": "connect",
-  "params": {
-    "token": "JWT_TOKEN_HERE"
-  }
-}`}
-                  </pre>
-                </div>
-                
-                <div>
-                  <h3 className="text-md font-medium mb-2">Subscribe Command</h3>
-                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
-                    {`{
-  "id": 2,
-  "method": "subscribe",
-  "params": {
-    "channel": "CHANNEL_NAME"
-  }
-}`}
-                  </pre>
-                </div>
-                
-                <div>
-                  <h3 className="text-md font-medium mb-2">Publish Command</h3>
-                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
-                    {`{
-  "id": 3,
-  "method": "publish",
-  "params": {
-    "channel": "CHANNEL_NAME",
-    "data": {
-      "text": "Your message here"
-    }
-  }
-}`}
-                  </pre>
-                </div>
-                
-                <div>
-                  <h3 className="text-md font-medium mb-2">Ping Command</h3>
-                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
-                    {`{
-  "id": 7,
-  "method": "ping",
-  "params": {}
-}`}
-                  </pre>
-                </div>
-              </div>
-              
-              <Alert className="bg-muted/50">
-                <Code className="h-4 w-4" />
-                <AlertTitle>Troubleshooting Tips</AlertTitle>
-                <AlertDescription>
-                  <ol className="list-decimal list-inside space-y-1 text-sm">
-                    <li>Always send a <strong>connect</strong> command immediately after WebSocket connection is established</li>
-                    <li>Ensure your JWT token is correctly formatted and signed</li>
-                    <li>For connection issues, check that the server URL is correct and accessible</li>
-                    <li>Send periodic <strong>ping</strong> commands to keep the connection alive</li>
-                    <li>Always check response errors by looking for <code className="text-xs bg-muted p-0.5 rounded">data.error</code> in responses</li>
-                  </ol>
-                </AlertDescription>
-              </Alert>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </Layout>
   );

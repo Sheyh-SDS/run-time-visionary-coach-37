@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { simulationApi, SIMULATION_MESSAGES } from '@/services/simulationApi';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { WebSocketState } from '@/services/websocket';
-import { toast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 
 // Define the context type
@@ -30,18 +30,58 @@ export const SimulationProvider: React.FC<{ children: ReactNode }> = ({ children
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   
+  // Process messages from the server
+  const handleMessage = (message: any) => {
+    console.log('Simulation message received:', message);
+    
+    // Process based on message type
+    if (!message || !message.type) return;
+    
+    switch (message.type) {
+      case SIMULATION_MESSAGES.ATHLETE_UPDATE:
+        // Invalidate athlete cache to trigger a refetch
+        queryClient.invalidateQueries({ queryKey: ['athletes'] });
+        break;
+      case SIMULATION_MESSAGES.SESSION_UPDATE:
+        // Invalidate sessions cache
+        queryClient.invalidateQueries({ queryKey: ['sessions'] });
+        break;
+      case SIMULATION_MESSAGES.LIVE_RACE_UPDATE:
+        // Update any live race data in the query cache
+        if (message.data) {
+          queryClient.setQueryData(['live-race'], message.data);
+        }
+        break;
+      case SIMULATION_MESSAGES.RACE_RESULTS:
+        // Update race results in the query cache
+        if (message.data) {
+          queryClient.setQueryData(['race-results'], message.data);
+        }
+        break;
+      default:
+        console.log('Unknown message type:', message.type);
+    }
+  };
+  
   // Use the WebSocket hook
   const { 
     connectionState, 
     isConnected,
     connect, 
-    disconnect 
+    disconnect,
+    subscribe
   } = useWebSocket({
     url: serverUrl,
     reconnectOnMount: !!serverUrl,
-    onMessage: (message) => {
-      // Handle global message processing if needed
-      console.log('WebSocket message received:', message);
+    onMessage: handleMessage,
+    onOpen: () => {
+      console.log('Centrifugo connection established');
+      
+      // Subscribe to simulation channels on connection
+      const channels = simulationApi.getChannels();
+      Object.values(channels).forEach(channel => {
+        subscribe(channel);
+      });
     }
   });
 
@@ -76,6 +116,11 @@ export const SimulationProvider: React.FC<{ children: ReactNode }> = ({ children
   // Connect to the simulation server
   const connectToServer = (url: string) => {
     try {
+      // Ensure URL is a valid Centrifugo WebSocket URL
+      if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
+        throw new Error('Invalid WebSocket URL format');
+      }
+      
       setServerUrl(url);
       connect(url);
       simulationApi.init(url);
