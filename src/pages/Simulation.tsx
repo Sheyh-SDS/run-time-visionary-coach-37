@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import RunSimulator from '@/components/RunSimulator';
 import SplitTimesChart from '@/components/SplitTimesChart';
 import ProbabilityChart from '@/components/ProbabilityChart';
@@ -10,41 +11,41 @@ import SessionDetail from '@/components/SessionDetail';
 import { RunSession, Athlete, ProbabilityAnalysis } from '@/types';
 import { simulationApi } from '@/services/simulationApi';
 import { toast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 
 const Simulation = () => {
   const [simulatedSession, setSimulatedSession] = useState<RunSession | null>(null);
-  const [athletes, setAthletes] = useState<Athlete[]>([]);
-  const [probabilityAnalysis, setProbabilityAnalysis] = useState<ProbabilityAnalysis | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [probabilityAnalysis, setProbabilityAnalysis] = useState<ProbabilityAnalysis | null>(null);
 
-  // Load athletes on mount
-  useEffect(() => {
-    const loadAthletes = async () => {
-      try {
-        const loadedAthletes = await simulationApi.getAthletes();
-        setAthletes(loadedAthletes);
-      } catch (error) {
-        console.error('Error loading athletes:', error);
-        toast({
-          title: "Ошибка загрузки",
-          description: "Не удалось загрузить данные спортсменов.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadAthletes();
-  }, []);
+  // Use React Query for fetching athletes with automatic caching
+  const { 
+    data: athletes = [], 
+    isLoading,
+    error: athletesError
+  } = useQuery({
+    queryKey: ['athletes'],
+    queryFn: simulationApi.getAthletes,
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    retry: 3,
+    onError: (err) => {
+      console.error('Error fetching athletes:', err);
+      toast({
+        title: "Ошибка загрузки",
+        description: "Не удалось загрузить данных спортсменов. Пожалуйста, попробуйте позже.",
+        variant: "destructive"
+      });
+    }
+  });
 
   // Load probability analysis when session changes
   useEffect(() => {
     if (simulatedSession) {
       const loadProbabilityAnalysis = async () => {
         setIsAnalysisLoading(true);
+        setError(null);
         try {
           const analysis = await simulationApi.getProbabilityAnalysis(
             simulatedSession.athleteId,
@@ -54,9 +55,17 @@ const Simulation = () => {
           
           if (analysis) {
             setProbabilityAnalysis(analysis);
+          } else {
+            setError("Не удалось получить анализ вероятностей для выбранного спортсмена");
           }
         } catch (error) {
           console.error('Error loading probability analysis:', error);
+          setError("Ошибка при загрузке анализа вероятностей");
+          toast({
+            title: "Ошибка анализа",
+            description: "Не удалось загрузить данные анализа вероятностей",
+            variant: "destructive"
+          });
         } finally {
           setIsAnalysisLoading(false);
         }
@@ -67,12 +76,34 @@ const Simulation = () => {
   }, [simulatedSession]);
 
   const handleSimulate = (session: RunSession) => {
-    setSimulatedSession(session);
-    toast({
-      title: "Симуляция завершена",
-      description: `Симуляция забега на ${session.distance}м создана`,
-    });
+    try {
+      setSimulatedSession(session);
+      setError(null);
+      toast({
+        title: "Симуляция завершена",
+        description: `Симуляция забега на ${session.distance}м создана`,
+      });
+    } catch (error) {
+      console.error("Error handling simulation:", error);
+      toast({
+        title: "Ошибка симуляции",
+        description: "Не удалось создать симуляцию забега",
+        variant: "destructive"
+      });
+    }
   };
+
+  const renderErrorState = (message: string) => (
+    <Card className="w-full">
+      <CardContent className="flex items-center p-6">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Ошибка</AlertTitle>
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <Layout>
@@ -95,6 +126,8 @@ const Simulation = () => {
                   </div>
                 </CardContent>
               </Card>
+            ) : athletesError ? (
+              renderErrorState("Не удалось загрузить список спортсменов. Пожалуйста, попробуйте позже.")
             ) : (
               <RunSimulator 
                 athletes={athletes}
@@ -126,6 +159,8 @@ const Simulation = () => {
                         </div>
                       </CardContent>
                     </Card>
+                  ) : error ? (
+                    renderErrorState(error)
                   ) : probabilityAnalysis ? (
                     <ProbabilityChart analysis={probabilityAnalysis} />
                   ) : (
