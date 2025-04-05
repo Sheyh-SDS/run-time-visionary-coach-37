@@ -30,16 +30,16 @@ const SplitTimesChart: React.FC<SplitTimesChartProps> = ({ session }) => {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
-            margin={{ top: 5, right: 30, left: 25, bottom: 50 }}
+            margin={{ top: 5, right: 30, left: 25, bottom: 65 }} // Increased bottom margin to prevent text overlap
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#eaeaea" />
             <XAxis 
               dataKey="split" 
-              label={{ value: 'Сплит', position: 'insideBottom', offset: -15 }}
+              label={{ value: 'Сплит', position: 'insideBottom', offset: -30 }} // Adjusted offset
               tick={{ fontSize: 12 }}
               axisLine={{ stroke: '#e2e8f0' }}
               tickLine={{ stroke: '#e2e8f0' }}
-              height={40}
+              height={60} // Increased height
             />
             <YAxis 
               tickFormatter={(value) => formatTime(value)}
