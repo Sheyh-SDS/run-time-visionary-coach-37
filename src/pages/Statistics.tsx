@@ -8,7 +8,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, 
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  Legend, Cell 
+  Legend, Cell, ComposedChart, Area 
 } from 'recharts';
 import { mockAthletes, mockRunSessions, mockPerformanceMetrics, formatTime } from '@/data/mockData';
 import { RunSession } from '@/types';
@@ -105,10 +105,63 @@ const Statistics = () => {
       .sort((a, b) => (b.count as number) - (a.count as number))
       .slice(0, 5); // Top 5 locations
   };
+  
+  // Mock data for characteristics over time
+  const prepareCharacteristicsData = () => {
+    if (selectedAthlete === 'all') {
+      return [];
+    }
+    
+    // This would ideally come from an API or database
+    // For now, we'll create mock data based on the athlete's current metrics
+    const athlete = mockAthletes.find(a => a.id === selectedAthlete);
+    if (!athlete || !athlete.reactionTime) return [];
+    
+    // Create a 6-month progression
+    const dates = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(now.getMonth() - i);
+      dates.push(date.toISOString().split('T')[0]);
+    }
+    
+    return dates.map((date, i) => {
+      const progress = i / 5; // 0 to 1 progress factor
+      
+      // Values start worse and improve over time
+      return {
+        date,
+        reactionTime: athlete.reactionTime ? athlete.reactionTime * (1.2 - 0.2 * progress) : null,
+        acceleration: athlete.acceleration ? athlete.acceleration * (0.8 + 0.2 * progress) : null,
+        maxSpeed: athlete.maxSpeed ? athlete.maxSpeed * (0.85 + 0.15 * progress) : null,
+        deceleration: athlete.deceleration ? athlete.deceleration * (0.9 + 0.1 * progress) : null,
+      };
+    });
+  };
+
+  // Prepare performance comparison data across athletes
+  const prepareCharacteristicsComparisonData = () => {
+    // Filter athletes with performance metrics
+    const athletesWithMetrics = mockAthletes.filter(a => a.reactionTime != null);
+    if (athletesWithMetrics.length === 0) return [];
+    
+    return athletesWithMetrics.map(athlete => {
+      return {
+        name: athlete.name,
+        reactionTime: athlete.reactionTime || 0,
+        maxSpeed: athlete.maxSpeed || 0,
+        acceleration: athlete.acceleration || 0,
+        deceleration: athlete.deceleration || 0
+      };
+    });
+  };
 
   const performanceData = preparePerformanceData();
   const trainingTypesData = prepareTrainingTypesData();
   const locationData = prepareLocationData();
+  const characteristicsData = prepareCharacteristicsData();
+  const characteristicsComparisonData = prepareCharacteristicsComparisonData();
 
   return (
     <Layout>
@@ -163,9 +216,10 @@ const Statistics = () => {
         </Card>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid grid-cols-3 mb-4">
+          <TabsList className="grid grid-cols-4 mb-4">
             <TabsTrigger value="overview">Обзор</TabsTrigger>
             <TabsTrigger value="performance">Результаты</TabsTrigger>
+            <TabsTrigger value="characteristics">Характеристики</TabsTrigger>
             <TabsTrigger value="distribution">Распределение</TabsTrigger>
           </TabsList>
           
@@ -258,6 +312,110 @@ const Statistics = () => {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+          </TabsContent>
+          
+          <TabsContent value="characteristics" className="m-0">
+            <div className="grid grid-cols-1 gap-4 mb-4">
+              {selectedAthlete !== 'all' ? (
+                <Card className="w-full h-[400px]">
+                  <CardHeader>
+                    <CardTitle>Изменение характеристик со временем</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[330px]">
+                    {characteristicsData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart 
+                          data={characteristicsData}
+                          margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis yAxisId="left" label={{ value: 'Скорость (м/с)', angle: -90, position: 'insideLeft' }} />
+                          <YAxis yAxisId="right" orientation="right" label={{ value: 'Время (с)', angle: 90, position: 'insideRight' }} />
+                          <Tooltip />
+                          <Legend />
+                          <Line 
+                            yAxisId="right" 
+                            type="monotone" 
+                            dataKey="reactionTime" 
+                            name="Время реакции (с)" 
+                            stroke="#8884d8" 
+                            strokeWidth={2} 
+                            dot={{ r: 4 }} 
+                          />
+                          <Line 
+                            yAxisId="left" 
+                            type="monotone" 
+                            dataKey="acceleration" 
+                            name="Ускорение (м/с²)" 
+                            stroke="#82ca9d" 
+                            strokeWidth={2} 
+                            dot={{ r: 4 }} 
+                          />
+                          <Line 
+                            yAxisId="left" 
+                            type="monotone" 
+                            dataKey="maxSpeed" 
+                            name="Макс. скорость (м/с)" 
+                            stroke="#ff7300" 
+                            strokeWidth={2} 
+                            dot={{ r: 4 }} 
+                          />
+                          <Line 
+                            yAxisId="left" 
+                            type="monotone" 
+                            dataKey="deceleration" 
+                            name="Замедление (м/с²)" 
+                            stroke="#0088fe" 
+                            strokeWidth={2} 
+                            dot={{ r: 4 }} 
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        Нет данных о характеристиках для выбранного спортсмена
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="w-full h-[400px]">
+                  <CardHeader>
+                    <CardTitle>Сравнение характеристик спортсменов</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[330px]">
+                    {characteristicsComparisonData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={characteristicsComparisonData}
+                          margin={{ top: 5, right: 30, left: 20, bottom: 50 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis 
+                            dataKey="name" 
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="maxSpeed" name="Макс. скорость (м/с)" fill="#ff7300" />
+                          <Bar dataKey="acceleration" name="Ускорение (м/с²)" fill="#82ca9d" />
+                          <Bar dataKey="deceleration" name="Замедление (м/с²)" fill="#0088fe" />
+                          <Bar dataKey="reactionTime" name="Время реакции (с)" fill="#8884d8" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        Нет данных о характеристиках спортсменов
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
           
           <TabsContent value="distribution" className="m-0">

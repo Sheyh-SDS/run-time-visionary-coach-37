@@ -19,6 +19,7 @@ const Simulation = () => {
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [probabilityAnalysis, setProbabilityAnalysis] = useState<ProbabilityAnalysis | null>(null);
+  const [selectedAthlete, setSelectedAthlete] = useState<Athlete | null>(null);
 
   // Use React Query for fetching athletes with automatic caching
   const { 
@@ -46,37 +47,49 @@ const Simulation = () => {
   // Load probability analysis when session changes
   useEffect(() => {
     if (simulatedSession) {
-      const loadProbabilityAnalysis = async () => {
-        setIsAnalysisLoading(true);
-        setError(null);
-        try {
-          const analysis = await simulationApi.getProbabilityAnalysis(
-            simulatedSession.athleteId,
-            simulatedSession.distance,
-            simulatedSession.time
-          );
-          
+      setIsAnalysisLoading(true);
+      setError(null);
+      
+      // Find the matching athlete
+      const athlete = athletes.find(a => a.id === simulatedSession.athleteId) || null;
+      setSelectedAthlete(athlete);
+      
+      try {
+        simulationApi.getProbabilityAnalysis(
+          simulatedSession.athleteId,
+          simulatedSession.distance,
+          simulatedSession.time
+        )
+        .then(analysis => {
           if (analysis) {
             setProbabilityAnalysis(analysis);
           } else {
             setError("Не удалось получить анализ вероятностей для выбранного спортсмена");
           }
-        } catch (error) {
+          setIsAnalysisLoading(false);
+        })
+        .catch(error => {
           console.error('Error loading probability analysis:', error);
           setError("Ошибка при загрузке анализа вероятностей");
+          setIsAnalysisLoading(false);
           toast({
             title: "Ошибка анализа",
             description: "Не удалось загрузить данные анализа вероятностей",
             variant: "destructive"
           });
-        } finally {
-          setIsAnalysisLoading(false);
-        }
-      };
-
-      loadProbabilityAnalysis();
+        });
+      } catch (error) {
+        console.error('Error loading probability analysis:', error);
+        setError("Ошибка при загрузке анализа вероятностей");
+        setIsAnalysisLoading(false);
+        toast({
+          title: "Ошибка анализа",
+          description: "Не удалось загрузить данные анализа вероятностей",
+          variant: "destructive"
+        });
+      }
     }
-  }, [simulatedSession]);
+  }, [simulatedSession, athletes]);
 
   const handleSimulate = (session: RunSession) => {
     try {
@@ -149,7 +162,7 @@ const Simulation = () => {
                 
                 <TabsContent value="results" className="m-0 space-y-4">
                   <SplitTimesChart session={simulatedSession} />
-                  <SessionDetail session={simulatedSession} />
+                  <SessionDetail session={simulatedSession} athlete={selectedAthlete} />
                 </TabsContent>
                 
                 <TabsContent value="analysis" className="m-0">

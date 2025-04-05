@@ -51,6 +51,11 @@ export interface PerformanceMetrics {
   recoveryRate: number;
   improvementRate: number;
   consistencyScore: number;
+  // Adding new performance metrics
+  reactionTimeProgress?: number; // percentage improvement over time
+  accelerationProgress?: number; // percentage improvement over time
+  maxSpeedProgress?: number; // percentage improvement over time
+  decelerationProgress?: number; // percentage improvement over time
 }
 
 // Probability analysis
@@ -107,7 +112,12 @@ export interface SimulationSettings {
   weatherConditions: 'ideal' | 'good' | 'moderate' | 'challenging' | 'extreme';
   terrainType: 'track' | 'road' | 'trail' | 'hills';
   competitionFactor: number; // 0-1, how much competition pushes the athlete
-  // New settings for race simulation
+  // New performance parameters
+  reactionTime?: number;
+  acceleration?: number;
+  maxSpeed?: number;
+  deceleration?: number;
+  // Original race simulation settings
   numberOfCompetitors?: number;
   includeRaceParameters?: boolean;
 }
@@ -121,4 +131,13 @@ export interface RaceResult {
   jerseyColor: string;
   time: number;
   difference: number; // difference from first place
+}
+
+// Performance characteristics history 
+export interface PerformanceHistory {
+  date: string;
+  reactionTime?: number;
+  acceleration?: number;
+  maxSpeed?: number;
+  deceleration?: number;
 }

@@ -3,15 +3,16 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, Thermometer, Wind } from 'lucide-react';
-import { RunSession } from '@/types';
+import { Calendar, Clock, MapPin, Thermometer, Wind, Zap, Gauge, Timer, TrendingDown } from 'lucide-react';
+import { RunSession, Athlete } from '@/types';
 import { formatTime } from '@/data/mockData';
 
 interface SessionDetailProps {
   session: RunSession;
+  athlete?: Athlete;
 }
 
-const SessionDetail: React.FC<SessionDetailProps> = ({ session }) => {
+const SessionDetail: React.FC<SessionDetailProps> = ({ session, athlete }) => {
   return (
     <Card className="w-full">
       <CardHeader>
@@ -87,6 +88,16 @@ const SessionDetail: React.FC<SessionDetailProps> = ({ session }) => {
                   <div className="font-medium">{session.location}</div>
                 </>
               )}
+              
+              {session.position && (
+                <>
+                  <div className="flex items-center">
+                    <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <span>Позиция в забеге:</span>
+                  </div>
+                  <div className="font-medium">{session.position}</div>
+                </>
+              )}
             </div>
           </div>
           
@@ -129,6 +140,54 @@ const SessionDetail: React.FC<SessionDetailProps> = ({ session }) => {
             </div>
           )}
         </div>
+        
+        {athlete && (
+          <>
+            <Separator className="my-4" />
+            <h3 className="text-sm font-medium mb-2">Характеристики бегуна</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {athlete.reactionTime && (
+                <div className="p-3 bg-secondary rounded-md">
+                  <div className="flex items-center text-muted-foreground text-xs mb-1">
+                    <Timer className="h-3 w-3 mr-1" />
+                    <span>Время реакции</span>
+                  </div>
+                  <div className="text-lg font-medium">{athlete.reactionTime.toFixed(2)} сек</div>
+                </div>
+              )}
+              
+              {athlete.acceleration && (
+                <div className="p-3 bg-secondary rounded-md">
+                  <div className="flex items-center text-muted-foreground text-xs mb-1">
+                    <Zap className="h-3 w-3 mr-1" />
+                    <span>Ускорение</span>
+                  </div>
+                  <div className="text-lg font-medium">{athlete.acceleration.toFixed(1)} м/с²</div>
+                </div>
+              )}
+              
+              {athlete.maxSpeed && (
+                <div className="p-3 bg-secondary rounded-md">
+                  <div className="flex items-center text-muted-foreground text-xs mb-1">
+                    <Gauge className="h-3 w-3 mr-1" />
+                    <span>Макс. скорость</span>
+                  </div>
+                  <div className="text-lg font-medium">{athlete.maxSpeed.toFixed(1)} м/с</div>
+                </div>
+              )}
+              
+              {athlete.deceleration && (
+                <div className="p-3 bg-secondary rounded-md">
+                  <div className="flex items-center text-muted-foreground text-xs mb-1">
+                    <TrendingDown className="h-3 w-3 mr-1" />
+                    <span>Замедление</span>
+                  </div>
+                  <div className="text-lg font-medium">{athlete.deceleration.toFixed(1)} м/с²</div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
         
         {session.notes && (
           <>

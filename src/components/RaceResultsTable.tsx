@@ -31,6 +31,24 @@ const RaceResultsTable: React.FC<RaceResultsTableProps> = ({
     );
   }
 
+  // Filter out any results with null time or 0 time (didn't participate)
+  const participantsResults = results.filter(result => result.time > 0);
+
+  if (participantsResults.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Результаты забега</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            В забеге не было участников с зарегистрированным временем.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -49,7 +67,7 @@ const RaceResultsTable: React.FC<RaceResultsTableProps> = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {results.map((result) => (
+            {participantsResults.map((result) => (
               <TableRow key={result.athleteId}>
                 <TableCell className="font-medium">{result.position}</TableCell>
                 <TableCell>

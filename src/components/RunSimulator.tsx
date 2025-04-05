@@ -26,7 +26,12 @@ const RunSimulator: React.FC<RunSimulatorProps> = ({ athletes, onSimulate }) => 
     fatigueRate: 0.1, // 10% fatigue effect
     weatherConditions: 'good',
     terrainType: 'track',
-    competitionFactor: 0.5 // 50% competition impact
+    competitionFactor: 0.5, // 50% competition impact
+    // New settings for performance parameters
+    reactionTime: 0.2, // in seconds
+    acceleration: 3.0, // meters per second squared
+    maxSpeed: 8.0, // meters per second
+    deceleration: 2.0, // meters per second squared
   });
 
   const handleSimulate = async () => {
@@ -49,6 +54,9 @@ const RunSimulator: React.FC<RunSimulatorProps> = ({ athletes, onSimulate }) => 
       setIsSimulating(false);
     }
   };
+
+  // Get selected athlete data for displaying current values
+  const selectedAthlete = athletes.find(athlete => athlete.id === selectedAthleteId);
 
   return (
     <Card className="w-full">
@@ -117,6 +125,97 @@ const RunSimulator: React.FC<RunSimulatorProps> = ({ athletes, onSimulate }) => 
                 setSettings({...settings, basePace: value})
               }
             />
+          </div>
+          
+          {/* New performance parameters */}
+          <div className="border-t pt-4">
+            <h3 className="font-medium mb-3">Характеристики бегуна</h3>
+            
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="reactionTime">
+                  Время реакции (сек): {settings.reactionTime.toFixed(2)}
+                  {selectedAthlete?.reactionTime && 
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      (Текущее: {selectedAthlete.reactionTime.toFixed(2)})
+                    </span>
+                  }
+                </Label>
+                <Slider
+                  id="reactionTime"
+                  min={0.1}
+                  max={0.5}
+                  step={0.01}
+                  value={[settings.reactionTime]}
+                  onValueChange={([value]) => 
+                    setSettings({...settings, reactionTime: value})
+                  }
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="acceleration">
+                  Ускорение (м/с²): {settings.acceleration.toFixed(1)}
+                  {selectedAthlete?.acceleration && 
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      (Текущее: {selectedAthlete.acceleration.toFixed(1)})
+                    </span>
+                  }
+                </Label>
+                <Slider
+                  id="acceleration"
+                  min={1.0}
+                  max={5.0}
+                  step={0.1}
+                  value={[settings.acceleration]}
+                  onValueChange={([value]) => 
+                    setSettings({...settings, acceleration: value})
+                  }
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="maxSpeed">
+                  Максимальная скорость (м/с): {settings.maxSpeed.toFixed(1)}
+                  {selectedAthlete?.maxSpeed && 
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      (Текущее: {selectedAthlete.maxSpeed.toFixed(1)})
+                    </span>
+                  }
+                </Label>
+                <Slider
+                  id="maxSpeed"
+                  min={5.0}
+                  max={12.0}
+                  step={0.1}
+                  value={[settings.maxSpeed]}
+                  onValueChange={([value]) => 
+                    setSettings({...settings, maxSpeed: value})
+                  }
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="deceleration">
+                  Замедление (м/с²): {settings.deceleration.toFixed(1)}
+                  {selectedAthlete?.deceleration && 
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      (Текущее: {selectedAthlete.deceleration.toFixed(1)})
+                    </span>
+                  }
+                </Label>
+                <Slider
+                  id="deceleration"
+                  min={1.0}
+                  max={4.0}
+                  step={0.1}
+                  value={[settings.deceleration]}
+                  onValueChange={([value]) => 
+                    setSettings({...settings, deceleration: value})
+                  }
+                />
+              </div>
+            </div>
           </div>
           
           <div className="grid gap-2">
