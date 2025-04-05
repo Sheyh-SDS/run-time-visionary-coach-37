@@ -16,13 +16,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Toggle } from "@/components/ui/toggle";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const WebSocketTest: React.FC = () => {
   // WebSocket hook
-  const [url, setUrl] = useState('wss://centrifugo.ops.roborace.co/connection/websocket');
-  const [token, setToken] = useState('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
-  const [channel, setChannel] = useState('channel');
+  const [url, setUrl] = useState('wss://intricately-tenacious-mantis.cloudpub.ru/ws/connection/websocket');
+  const [token, setToken] = useState('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SB4MqSE0zFQHWYumo3NGLN11X6pLQkNNhvAqmh6Wtew');
+  const [channel, setChannel] = useState('news');
   const [logs, setLogs] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('simple');
@@ -31,7 +30,6 @@ const WebSocketTest: React.FC = () => {
   const [cmdParams, setCmdParams] = useState('');
   const [debugMode, setDebugMode] = useState(true);
   const [autoSubscribe, setAutoSubscribe] = useState(false);
-  const [connectionMethod, setConnectionMethod] = useState<'command' | 'url'>('url');
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Use the WebSocket hook
@@ -48,7 +46,6 @@ const WebSocketTest: React.FC = () => {
   } = useWebSocket({
     debug: debugMode,
     autoSubscribeChannels: autoSubscribe ? [channel] : [],
-    token: connectionMethod === 'url' ? token : undefined,
   });
 
   // Add log entry with timestamp
@@ -77,20 +74,16 @@ const WebSocketTest: React.FC = () => {
         break;
       case 'open':
         addLog('WebSocket connection established');
-        // If using command-based auth, send connect command after connection
-        if (connectionMethod === 'command' && token) {
-          centrifugo.connect(token);
-          addLog(`Sent connect command with token`);
-        }
         break;
       case 'closed':
         addLog(`WebSocket connection closed${lastError ? `: code=${lastError.code}, reason=${lastError.reason}` : ''}`);
         break;
       case 'error':
-        addLog(`WebSocket error: ${lastError ? (lastError.reason || lastError.message || 'Unknown error') : 'Unknown error'}`, true);
+        // Fixed here: checking if lastError exists before accessing message
+        addLog(`WebSocket error: ${lastError ? (lastError.reason || 'Unknown error') : 'Unknown error'}`, true);
         break;
     }
-  }, [connectionState, lastError, token, connectionMethod, centrifugo]);
+  }, [connectionState, lastError]);
 
   // Log client ID when it changes
   useEffect(() => {
@@ -212,25 +205,25 @@ const WebSocketTest: React.FC = () => {
           params = { ...params, channel };
         }
 
-        // Type-safe method calling
+        // Fixed: Type-safe method calling
         switch(cmdMethod) {
           case 'connect':
             centrifugo.connect(params.token || token);
             break;
           case 'subscribe':
-            centrifugo.subscribe(params.channel || channel);
+            centrifugo.subscribe(params.channel);
             break;
           case 'unsubscribe':
-            centrifugo.unsubscribe(params.channel || channel);
+            centrifugo.unsubscribe(params.channel);
             break;
           case 'publish':
-            centrifugo.publish(params.channel || channel, params.data || {});
+            centrifugo.publish(params.channel, params.data || {});
             break;
           case 'presence':
-            centrifugo.presence(params.channel || channel);
+            centrifugo.presence(params.channel);
             break;
           case 'history':
-            centrifugo.history(params.channel || channel);
+            centrifugo.history(params.channel);
             break;
           case 'ping':
             centrifugo.ping();
@@ -360,13 +353,13 @@ const WebSocketTest: React.FC = () => {
   return (
     <Layout>
       <div className="container mx-auto py-4">
-        <h1 className="text-2xl font-bold mb-6">Centrifugo WebSocket Connection Test</h1>
+        <h1 className="text-2xl font-bold mb-6">WebSocket Connection Test</h1>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Connection Settings</CardTitle>
-              <CardDescription>Configure your Centrifugo WebSocket connection</CardDescription>
+              <CardDescription>Configure your WebSocket connection parameters</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -420,30 +413,6 @@ const WebSocketTest: React.FC = () => {
                   placeholder="Enter channel to subscribe"
                 />
               </div>
-
-              <div className="border rounded-lg p-4 bg-secondary/10">
-                <Label className="mb-2 block">Authentication Method</Label>
-                <RadioGroup
-                  value={connectionMethod}
-                  onValueChange={(val) => setConnectionMethod(val as 'command' | 'url')}
-                  className="flex flex-col space-y-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="url" id="auth-url" />
-                    <Label htmlFor="auth-url" className="font-medium">Send token in URL parameters</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="command" id="auth-cmd" />
-                    <Label htmlFor="auth-cmd" className="font-medium">Send token as Connect command</Label>
-                  </div>
-                </RadioGroup>
-                <div className="mt-2 text-sm text-muted-foreground">
-                  {connectionMethod === 'url' ? 
-                    'Token will be sent as URL parameter during connection' : 
-                    'Token will be sent as a separate command after connection is established'
-                  }
-                </div>
-              </div>
               
               <div className="flex items-center justify-between space-x-2 pt-2">
                 <div className="flex items-center space-x-2">
@@ -472,17 +441,11 @@ const WebSocketTest: React.FC = () => {
                   <AlertTitle>Connection Error</AlertTitle>
                   <AlertDescription>
                     <p>Code: {lastError.code}</p>
-                    <p>Reason: {lastError.reason || lastError.message || 'No reason provided'}</p>
+                    <p>Reason: {lastError.reason || 'No reason provided'}</p>
                     {lastError.code === 3501 && (
                       <p className="mt-2">
-                        Error 3501 (Bad Request) обычно указывает на проблему с параметрами подключения или форматом токена.
-                        Попробуйте другой токен или проверьте, ожидает ли сервер определенный формат.
-                      </p>
-                    )}
-                    {lastError.code === 3502 && (
-                      <p className="mt-2">
-                        Error 3502 (Stale) означает, что соединение устарело и было закрыто сервером.
-                        Это может произойти, если токен истек или сервер перезапустился.
+                        Error 3501 (Bad Request) usually indicates an issue with the connection parameters or token format. 
+                        Try a different token or check if the server expects a specific format.
                       </p>
                     )}
                   </AlertDescription>
@@ -529,7 +492,7 @@ const WebSocketTest: React.FC = () => {
               
               <Button 
                 onClick={sendAuthentication}
-                disabled={!isConnected || !token || connectionMethod === 'url'}
+                disabled={!isConnected || !token}
                 variant="secondary"
               >
                 Authenticate
@@ -797,9 +760,9 @@ const WebSocketTest: React.FC = () => {
                   </Alert>
                   
                   <Alert>
-                    <AlertTitle>Error 3502 (Stale)</AlertTitle>
+                    <AlertTitle>Error 1006 (Abnormal Close)</AlertTitle>
                     <AlertDescription>
-                      The connection was closed because it became stale. This often happens when a token expires or the server restarts.
+                      The connection was closed abnormally, without proper closing handshake. This often indicates network problems or server issues.
                     </AlertDescription>
                   </Alert>
                 </div>
@@ -826,7 +789,7 @@ const WebSocketTest: React.FC = () => {
   "id": 2,
   "method": "subscribe",
   "params": {
-    "channel": "channel"
+    "channel": "CHANNEL_NAME"
   }
 }`}
                   </pre>
@@ -839,9 +802,9 @@ const WebSocketTest: React.FC = () => {
   "id": 3,
   "method": "publish",
   "params": {
-    "channel": "channel",
+    "channel": "CHANNEL_NAME",
     "data": {
-      "text": "Hello from WebSocket test!"
+      "text": "Your message here"
     }
   }
 }`}
@@ -865,11 +828,11 @@ const WebSocketTest: React.FC = () => {
                 <AlertTitle>Troubleshooting Tips</AlertTitle>
                 <AlertDescription>
                   <ol className="list-decimal list-inside space-y-1 text-sm">
-                    <li>Для соединения с Centrifugo токен можно передавать двумя способами: в URL параметре <code className="text-xs bg-muted p-0.5 rounded">?token=JWT_TOKEN</code> или через команду после установления соединения</li>
-                    <li>JWT токен должен содержать необходимые claims, чаще всего нужны: <code className="text-xs bg-muted p-0.5 rounded">sub</code> (идентификатор пользователя) и <code className="text-xs bg-muted p-0.5 rounded">exp</code> (срок действия)</li>
-                    <li>Для постоянного поддержания соединения отправляйте периодические ping-команды</li>
-                    <li>При ошибках 3501 или 3502 проверьте формат и содержимое токена</li>
-                    <li>Подписывайтесь на каналы только после успешной аутентификации (получения client_id)</li>
+                    <li>Always send a <strong>connect</strong> command immediately after WebSocket connection is established</li>
+                    <li>Ensure your JWT token is correctly formatted and signed</li>
+                    <li>For connection issues, check that the server URL is correct and accessible</li>
+                    <li>Send periodic <strong>ping</strong> commands to keep the connection alive</li>
+                    <li>Always check response errors by looking for <code className="text-xs bg-muted p-0.5 rounded">data.error</code> in responses</li>
                   </ol>
                 </AlertDescription>
               </Alert>

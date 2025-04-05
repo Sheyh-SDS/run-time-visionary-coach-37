@@ -35,7 +35,6 @@ class WebSocketService {
     }
 
     try {
-      console.log(`Connecting to WebSocket at URL: ${url}`);
       this.socket = new WebSocket(url);
       this.registerSocketListeners();
       this.notifyStateChange('connecting');
@@ -58,14 +57,6 @@ class WebSocketService {
       this.reconnectAttempts = 0;
       this.lastError = null;
       this.notifyStateChange('open');
-      
-      // Проверим, содержит ли URL токен (info.query.token)
-      const urlParams = new URL(this.socket!.url).searchParams;
-      const tokenFromUrl = urlParams.get('token');
-      
-      if (tokenFromUrl) {
-        console.log('Token was provided in URL, no need to send connect command');
-      }
     };
 
     this.socket.onmessage = (event) => {
