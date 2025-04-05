@@ -9,7 +9,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Activity, User, Calendar, LineChart, BarChart, Gauge, Flag, BarChart2 } from 'lucide-react';
+import { Menu, Activity, User, Calendar, LineChart, BarChart, Gauge, Flag, BarChart2, Wifi } from 'lucide-react';
 
 const MobileSidebar: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -98,6 +98,14 @@ const MobileSidebar: React.FC = () => {
                 >
                   <BarChart2 className="h-5 w-5" />
                   <span>Анализ забегов</span>
+                </Link>
+                <Link 
+                  to="/websocket" 
+                  className="flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-secondary w-full"
+                  onClick={() => setOpen(false)}
+                >
+                  <Wifi className="h-5 w-5" />
+                  <span>WebSocket</span>
                 </Link>
               </div>
             </div>
