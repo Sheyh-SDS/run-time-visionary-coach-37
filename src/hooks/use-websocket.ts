@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { webSocketService, WebSocketState, WebSocketMessage } from '@/services/websocket';
 
@@ -17,7 +18,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const [connectionState, setConnectionState] = useState<WebSocketState>(
     webSocketService.getState()
   );
-  const [lastError, setLastError] = useState<{ code?: number; reason?: string } | null>(null);
+  const [lastError, setLastError] = useState<{ code?: number; reason?: string; message?: string } | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<number | null>(null);

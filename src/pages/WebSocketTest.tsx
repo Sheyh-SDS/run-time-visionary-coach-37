@@ -79,7 +79,8 @@ const WebSocketTest: React.FC = () => {
         addLog(`WebSocket connection closed${lastError ? `: code=${lastError.code}, reason=${lastError.reason}` : ''}`);
         break;
       case 'error':
-        addLog(`WebSocket error: ${lastError?.message || 'Unknown error'}`, true);
+        // Fixed here: checking if lastError exists before accessing message
+        addLog(`WebSocket error: ${lastError ? (lastError.reason || 'Unknown error') : 'Unknown error'}`, true);
         break;
     }
   }, [connectionState, lastError]);
@@ -189,7 +190,7 @@ const WebSocketTest: React.FC = () => {
 
       try {
         // Parse params if provided
-        let params = {};
+        let params: Record<string, any> = {};
         if (cmdParams) {
           try {
             params = JSON.parse(cmdParams);
@@ -201,10 +202,34 @@ const WebSocketTest: React.FC = () => {
 
         // Add channel to params for certain methods
         if (['subscribe', 'unsubscribe', 'publish', 'presence', 'history'].includes(cmdMethod) && !params.channel) {
-          params = { ...params, channel: channel };
+          params = { ...params, channel };
         }
 
-        centrifugo[cmdMethod as keyof typeof centrifugo]?.(params.channel, params.data);
+        // Fixed: Type-safe method calling
+        switch(cmdMethod) {
+          case 'connect':
+            centrifugo.connect(params.token || token);
+            break;
+          case 'subscribe':
+            centrifugo.subscribe(params.channel);
+            break;
+          case 'unsubscribe':
+            centrifugo.unsubscribe(params.channel);
+            break;
+          case 'publish':
+            centrifugo.publish(params.channel, params.data || {});
+            break;
+          case 'presence':
+            centrifugo.presence(params.channel);
+            break;
+          case 'history':
+            centrifugo.history(params.channel);
+            break;
+          case 'ping':
+            centrifugo.ping();
+            break;
+        }
+        
         addLog(`Sent ${cmdMethod} command with params: ${JSON.stringify(params)}`);
       } catch (e) {
         addLog(`Error sending command: ${e}`, true);
