@@ -1,3 +1,4 @@
+
 import { toast } from "@/hooks/use-toast";
 
 // WebSocket connection states
@@ -206,7 +207,73 @@ class WebSocketService {
         return 'closed';
     }
   }
+
+  // Support for Unity WebGL based simulations
+  connectToUnitySimulation(unityInstance: any): void {
+    // Method to be called when Unity is loaded and ready
+    // The unityInstance would be the reference to the Unity WebGL instance
+    
+    if (!unityInstance) {
+      console.error('Unity instance is not provided');
+      return;
+    }
+    
+    try {
+      // Register a method to receive data from Unity
+      // This assumes Unity will call this method via JSLib
+      window.receiveFromUnity = (jsonData: string) => {
+        try {
+          const data = JSON.parse(jsonData);
+          this.handleMessage({
+            type: data.type || 'unity_message',
+            payload: data
+          });
+        } catch (error) {
+          console.error('Error parsing data from Unity:', error);
+        }
+      };
+      
+      console.log('Unity simulation connection established');
+      toast({
+        title: "Подключено к Unity",
+        description: "Соединение с симуляцией Unity установлено."
+      });
+      
+    } catch (error) {
+      console.error('Error connecting to Unity simulation:', error);
+      toast({
+        title: "Ошибка подключения",
+        description: "Не удалось подключиться к симуляции Unity.",
+        variant: "destructive"
+      });
+    }
+  }
+  
+  // Send data to Unity
+  sendToUnity(method: string, data: any): boolean {
+    try {
+      if (window.unityInstance) {
+        const stringData = JSON.stringify(data);
+        window.unityInstance.SendMessage('WebSocketReceiver', method, stringData);
+        return true;
+      } else {
+        console.warn('Unity instance not available');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error sending data to Unity:', error);
+      return false;
+    }
+  }
 }
 
 // Create singleton instance
 export const webSocketService = new WebSocketService();
+
+// Add global types for Unity integration
+declare global {
+  interface Window {
+    receiveFromUnity: (jsonData: string) => void;
+    unityInstance: any;
+  }
+}

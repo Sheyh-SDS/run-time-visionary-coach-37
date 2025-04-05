@@ -8,6 +8,14 @@ export interface Athlete {
   specialization: string[];
   personalBests: Record<string, number>; // e.g. {"100m": 10.5, "200m": 21.2}
   imageUrl?: string;
+  // New performance parameters
+  reactionTime?: number; // in seconds
+  acceleration?: number; // meters per second squared
+  maxSpeed?: number; // meters per second
+  deceleration?: number; // meters per second squared
+  // Race parameters
+  number?: number; // Runner's number (1-6)
+  jerseyColor?: string; // Color of jersey
 }
 
 // Run session
@@ -32,6 +40,7 @@ export interface RunSession {
     windSpeed?: number;
   };
   notes?: string;
+  position?: number; // Final position in the race
 }
 
 // Performance analysis
@@ -53,6 +62,40 @@ export interface ProbabilityAnalysis {
     name: string;
     impact: number; // -1 to 1, negative is bad, positive is good
   }[];
+  positionProbabilities?: PositionProbability[]; // Added position probabilities
+}
+
+// Position probability
+export interface PositionProbability {
+  position: number;
+  probability: number;
+}
+
+// Top N probability
+export interface TopNProbability {
+  topN: number[];
+  probability: number;
+}
+
+// Live race data
+export interface LiveRaceData {
+  raceId: string;
+  distance: number;
+  status: 'pending' | 'starting' | 'running' | 'finished';
+  athletes: LiveAthleteData[];
+  elapsedTime: number;
+}
+
+// Live athlete data
+export interface LiveAthleteData {
+  athleteId: string;
+  number: number;
+  name: string;
+  jerseyColor: string;
+  currentPosition: number;
+  currentDistance: number;
+  currentSpeed: number;
+  splitTimes: number[];
 }
 
 // Simulation settings
@@ -64,4 +107,18 @@ export interface SimulationSettings {
   weatherConditions: 'ideal' | 'good' | 'moderate' | 'challenging' | 'extreme';
   terrainType: 'track' | 'road' | 'trail' | 'hills';
   competitionFactor: number; // 0-1, how much competition pushes the athlete
+  // New settings for race simulation
+  numberOfCompetitors?: number;
+  includeRaceParameters?: boolean;
+}
+
+// Race results table
+export interface RaceResult {
+  position: number;
+  number: number;
+  athleteId: string;
+  athleteName: string;
+  jerseyColor: string;
+  time: number;
+  difference: number; // difference from first place
 }

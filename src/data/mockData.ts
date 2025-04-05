@@ -1,5 +1,13 @@
-
-import { Athlete, RunSession, PerformanceMetrics, ProbabilityAnalysis } from '../types';
+import { 
+  Athlete, 
+  RunSession, 
+  PerformanceMetrics, 
+  ProbabilityAnalysis, 
+  LiveRaceData,
+  RaceResult,
+  PositionProbability,
+  TopNProbability
+} from '../types';
 
 export const mockAthletes: Athlete[] = [
   {
@@ -13,7 +21,13 @@ export const mockAthletes: Athlete[] = [
       "200м": 20.85,
       "60м": 6.65
     },
-    imageUrl: "/placeholder.svg"
+    imageUrl: "/placeholder.svg",
+    reactionTime: 0.142,
+    acceleration: 6.8,
+    maxSpeed: 10.2,
+    deceleration: 1.3,
+    number: 1,
+    jerseyColor: "#ea384c" // red
   },
   {
     id: "2",
@@ -26,7 +40,13 @@ export const mockAthletes: Athlete[] = [
       "800м": 1.59,
       "200м": 23.76
     },
-    imageUrl: "/placeholder.svg"
+    imageUrl: "/placeholder.svg",
+    reactionTime: 0.157,
+    acceleration: 5.9,
+    maxSpeed: 9.1,
+    deceleration: 1.1,
+    number: 2,
+    jerseyColor: "#0EA5E9" // blue
   },
   {
     id: "3",
@@ -39,7 +59,13 @@ export const mockAthletes: Athlete[] = [
       "1500м": 3.42,
       "1000м": 2.21
     },
-    imageUrl: "/placeholder.svg"
+    imageUrl: "/placeholder.svg",
+    reactionTime: 0.168,
+    acceleration: 5.2,
+    maxSpeed: 8.7,
+    deceleration: 0.9,
+    number: 3,
+    jerseyColor: "#F2FCE2" // green
   },
   {
     id: "4",
@@ -52,7 +78,51 @@ export const mockAthletes: Athlete[] = [
       "200м": 23.5,
       "100м": 11.68
     },
-    imageUrl: "/placeholder.svg"
+    imageUrl: "/placeholder.svg",
+    reactionTime: 0.153,
+    acceleration: 6.1,
+    maxSpeed: 8.9,
+    deceleration: 1.2,
+    number: 4,
+    jerseyColor: "#FEF7CD" // yellow
+  },
+  {
+    id: "5",
+    name: "Игорь Смирнов",
+    age: 24,
+    gender: "male",
+    specialization: ["400м", "400м с барьерами"],
+    personalBests: {
+      "400м": 46.82,
+      "400м с барьерами": 49.34,
+      "200м": 21.95
+    },
+    imageUrl: "/placeholder.svg",
+    reactionTime: 0.161,
+    acceleration: 6.4,
+    maxSpeed: 9.6,
+    deceleration: 1.25,
+    number: 5,
+    jerseyColor: "#9b87f5" // purple
+  },
+  {
+    id: "6",
+    name: "Екатерина Новикова",
+    age: 22,
+    gender: "female",
+    specialization: ["1500м", "3000м"],
+    personalBests: {
+      "1500м": 4.12,
+      "3000м": 9.05,
+      "800м": 2.04
+    },
+    imageUrl: "/placeholder.svg",
+    reactionTime: 0.175,
+    acceleration: 4.8,
+    maxSpeed: 7.9,
+    deceleration: 0.85,
+    number: 6,
+    jerseyColor: "#F97316" // orange
   }
 ];
 
@@ -174,6 +244,14 @@ export const mockProbabilityAnalysis: Record<string, ProbabilityAnalysis> = {
       { name: "Психологический настрой", impact: 0.7 },
       { name: "История выступлений", impact: 0.85 },
       { name: "Погодные условия", impact: -0.2 }
+    ],
+    positionProbabilities: [
+      { position: 1, probability: 0.45 },
+      { position: 2, probability: 0.28 },
+      { position: 3, probability: 0.15 },
+      { position: 4, probability: 0.07 },
+      { position: 5, probability: 0.03 },
+      { position: 6, probability: 0.02 }
     ]
   },
   "2": {
@@ -186,8 +264,151 @@ export const mockProbabilityAnalysis: Record<string, ProbabilityAnalysis> = {
       { name: "Психологический настрой", impact: 0.8 },
       { name: "История выступлений", impact: 0.72 },
       { name: "Погодные условия", impact: 0.1 }
+    ],
+    positionProbabilities: [
+      { position: 1, probability: 0.38 },
+      { position: 2, probability: 0.27 },
+      { position: 3, probability: 0.18 },
+      { position: 4, probability: 0.1 },
+      { position: 5, probability: 0.05 },
+      { position: 6, probability: 0.02 }
     ]
   }
+};
+
+// Mock race results
+export const mockRaceResults: RaceResult[] = [
+  {
+    position: 1,
+    number: 1,
+    athleteId: "1",
+    athleteName: "Алексей Петров",
+    jerseyColor: "#ea384c",
+    time: 10.42,
+    difference: 0
+  },
+  {
+    position: 2,
+    number: 5,
+    athleteId: "5",
+    athleteName: "Игорь Смирнов",
+    jerseyColor: "#9b87f5",
+    time: 10.57,
+    difference: 0.15
+  },
+  {
+    position: 3,
+    number: 3,
+    athleteId: "3",
+    athleteName: "Дмитрий Соколов",
+    jerseyColor: "#F2FCE2",
+    time: 10.68,
+    difference: 0.26
+  },
+  {
+    position: 4,
+    number: 2,
+    athleteId: "2",
+    athleteName: "Мария Иванова",
+    jerseyColor: "#0EA5E9",
+    time: 11.12,
+    difference: 0.70
+  },
+  {
+    position: 5,
+    number: 4,
+    athleteId: "4",
+    athleteName: "Анна Козлова",
+    jerseyColor: "#FEF7CD",
+    time: 11.25,
+    difference: 0.83
+  },
+  {
+    position: 6,
+    number: 6,
+    athleteId: "6",
+    athleteName: "Екатерина Новикова",
+    jerseyColor: "#F97316",
+    time: 11.47,
+    difference: 1.05
+  }
+];
+
+// Mock top N probabilities
+export const mockTopNProbabilities: TopNProbability[] = [
+  { topN: [1, 2], probability: 0.65 },
+  { topN: [1, 2, 3], probability: 0.82 },
+  { topN: [2, 3], probability: 0.38 }
+];
+
+// Mock live race data
+export const mockLiveRaceData: LiveRaceData = {
+  raceId: "live-1",
+  distance: 100,
+  status: 'running',
+  athletes: [
+    {
+      athleteId: "1",
+      number: 1,
+      name: "Алексей Петров",
+      jerseyColor: "#ea384c",
+      currentPosition: 1,
+      currentDistance: 65.4,
+      currentSpeed: 10.1,
+      splitTimes: [1.8, 3.5, 5.2]
+    },
+    {
+      athleteId: "5",
+      number: 5,
+      name: "Игорь Смирнов",
+      jerseyColor: "#9b87f5",
+      currentPosition: 2,
+      currentDistance: 64.2,
+      currentSpeed: 10.0,
+      splitTimes: [1.85, 3.6, 5.3]
+    },
+    {
+      athleteId: "3",
+      number: 3,
+      name: "Дмитрий Соколов",
+      jerseyColor: "#F2FCE2",
+      currentPosition: 3,
+      currentDistance: 63.1,
+      currentSpeed: 9.8,
+      splitTimes: [1.9, 3.7, 5.4]
+    },
+    {
+      athleteId: "2",
+      number: 2,
+      name: "Мария Иванова",
+      jerseyColor: "#0EA5E9",
+      currentPosition: 4,
+      currentDistance: 61.5,
+      currentSpeed: 9.6,
+      splitTimes: [2.0, 3.9, 5.7]
+    },
+    {
+      athleteId: "4",
+      number: 4,
+      name: "Анна Козлова",
+      jerseyColor: "#FEF7CD",
+      currentPosition: 5,
+      currentDistance: 60.8,
+      currentSpeed: 9.5,
+      splitTimes: [2.05, 4.0, 5.8]
+    },
+    {
+      athleteId: "6",
+      number: 6,
+      name: "Екатерина Новикова",
+      jerseyColor: "#F97316",
+      currentPosition: 6,
+      currentDistance: 59.2,
+      currentSpeed: 9.2,
+      splitTimes: [2.1, 4.1, 6.0]
+    }
+  ],
+  elapsedTime: 6.5
 };
 
 // Utility function to generate realistic running data
@@ -325,10 +546,132 @@ export function calculateProbability(
     { name: "Погодные условия", impact: Math.random() * 0.6 - 0.3 } // -0.3 to 0.3
   ];
   
+  // Generate position probabilities
+  const positionProbabilities: PositionProbability[] = [];
+  
+  // Simple model for position probabilities
+  const basePositionProb = Math.min(0.95, Math.max(0.05, probability));
+  for (let i = 1; i <= 6; i++) {
+    let posProb = 0;
+    
+    if (i === 1) {
+      posProb = basePositionProb * 0.6;
+    } else if (i === 2) {
+      posProb = basePositionProb * 0.25;
+    } else if (i === 3) {
+      posProb = basePositionProb * 0.1;
+    } else {
+      posProb = (1 - basePositionProb) / 3;
+    }
+    
+    positionProbabilities.push({
+      position: i,
+      probability: parseFloat(posProb.toFixed(2))
+    });
+  }
+  
+  // Adjust to ensure they sum to 1
+  const totalProb = positionProbabilities.reduce((sum, p) => sum + p.probability, 0);
+  positionProbabilities.forEach(p => {
+    p.probability = parseFloat((p.probability / totalProb).toFixed(2));
+  });
+  
   return {
     targetTime,
     probability,
     confidenceInterval,
-    factors
+    factors,
+    positionProbabilities
   };
+}
+
+// Function to calculate top-N probability
+export function calculateTopNProbability(
+  positionProbabilities: PositionProbability[],
+  n: number[]
+): number {
+  let probability = 0;
+  
+  for (const position of n) {
+    const posProb = positionProbabilities.find(p => p.position === position);
+    if (posProb) {
+      probability += posProb.probability;
+    }
+  }
+  
+  return parseFloat(probability.toFixed(2));
+}
+
+// Function to generate race with competitors
+export function generateRaceWithCompetitors(
+  mainAthlete: Athlete,
+  distance: number,
+  competitors: Athlete[] = []
+): RaceResult[] {
+  // Ensure we have competitors
+  let allCompetitors = [...competitors];
+  if (!allCompetitors.includes(mainAthlete)) {
+    allCompetitors.push(mainAthlete);
+  }
+  
+  // Fill with mock athletes if needed
+  while (allCompetitors.length < 6) {
+    const availableMocks = mockAthletes.filter(a => !allCompetitors.some(c => c.id === a.id));
+    if (availableMocks.length === 0) break;
+    allCompetitors.push(availableMocks[0]);
+    // Remove the used mock to avoid duplicates
+    mockAthletes.splice(mockAthletes.findIndex(a => a.id === availableMocks[0].id), 1);
+  }
+  
+  // Generate race times for each competitor
+  const results: RaceResult[] = allCompetitors.map(athlete => {
+    // Find relevant personal best
+    const relevantDistance = `${distance}м`;
+    let baseTime = 0;
+    
+    if (athlete.personalBests[relevantDistance]) {
+      baseTime = athlete.personalBests[relevantDistance];
+    } else {
+      // Estimate from another distance if exact one isn't available
+      const distances = Object.keys(athlete.personalBests);
+      if (distances.length > 0) {
+        const nearestDistance = distances.reduce((prev, curr) => {
+          const prevDist = parseInt(prev, 10);
+          const currDist = parseInt(curr, 10);
+          return Math.abs(currDist - distance) < Math.abs(prevDist - distance) ? curr : prev;
+        });
+        
+        const ratio = distance / parseInt(nearestDistance, 10);
+        baseTime = athlete.personalBests[nearestDistance] * ratio;
+      } else {
+        // Fallback if no personal bests
+        baseTime = distance / 7; // Assume 7 m/s average speed
+      }
+    }
+    
+    // Apply some randomness to the time
+    const randomFactor = 0.98 + Math.random() * 0.04; // 0.98 to 1.02
+    const time = baseTime * randomFactor;
+    
+    return {
+      position: 0, // Will be calculated after sorting
+      number: athlete.number || 0,
+      athleteId: athlete.id,
+      athleteName: athlete.name,
+      jerseyColor: athlete.jerseyColor || "#cccccc",
+      time: parseFloat(time.toFixed(2)),
+      difference: 0 // Will be calculated after sorting
+    };
+  });
+  
+  // Sort by time
+  results.sort((a, b) => a.time - b.time);
+  
+  // Assign positions and differences
+  results.forEach((result, index) => {
+    result.position = index + 1;
+    result.difference = index === 0 ? 0 : parseFloat((result.time - results[0].time).toFixed(2));
+  });
+  
+  return results;
 }
