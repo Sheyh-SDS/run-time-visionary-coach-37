@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 
 interface AthletePerformanceData {
@@ -39,9 +38,9 @@ const AthletePerformanceChart: React.FC<AthletePerformanceChartProps> = ({ athle
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-background border rounded-md shadow-md p-3 text-sm">
-          <p className="font-medium mb-2">{label}</p>
-          <div className="space-y-1">
+        <div className="bg-white border border-gray-200 rounded-md shadow-md p-3 text-sm">
+          <p className="font-medium mb-2 text-gray-800">{label}</p>
+          <div className="space-y-1.5">
             {payload.map((entry: any, index: number) => {
               const athleteNumber = entry.dataKey.replace('athlete', '');
               const color = entry.payload[`color${athleteNumber}`];
@@ -50,7 +49,7 @@ const AthletePerformanceChart: React.FC<AthletePerformanceChartProps> = ({ athle
               return (
                 <div key={index} className="flex items-center space-x-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
-                  <span>{name}: {entry.value} место</span>
+                  <span className="text-gray-700">{name}: {entry.value} место</span>
                 </div>
               );
             })}
@@ -71,7 +70,7 @@ const AthletePerformanceChart: React.FC<AthletePerformanceChartProps> = ({ athle
               className="w-4 h-4 rounded-full" 
               style={{ backgroundColor: athlete.color }}
             ></div>
-            <span className="text-sm">
+            <span className="text-sm text-gray-700">
               №{athlete.number} {athlete.name}
             </span>
           </div>
@@ -85,27 +84,27 @@ const AthletePerformanceChart: React.FC<AthletePerformanceChartProps> = ({ athle
     <ResponsiveContainer width="100%" height="100%">
       <LineChart
         data={transformedData}
-        margin={{ top: 10, right: 30, left: 10, bottom: 30 }}
+        margin={{ top: 10, right: 30, left: 10, bottom: 35 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" />
         <XAxis 
           dataKey="race" 
-          tick={{ fontSize: 12 }}
-          axisLine={{ stroke: '#e2e8f0' }}
-          tickLine={{ stroke: '#e2e8f0' }}
+          tick={{ fontSize: 12, fill: "#4b5563" }}
+          axisLine={{ stroke: '#9ca3af' }}
+          tickLine={{ stroke: '#9ca3af' }}
         />
         <YAxis 
           domain={[1, 6]}
           reversed
           ticks={[1, 2, 3, 4, 5, 6]}
-          tick={{ fontSize: 12 }}
-          axisLine={{ stroke: '#e2e8f0' }}
-          tickLine={{ stroke: '#e2e8f0' }}
+          tick={{ fontSize: 12, fill: "#4b5563" }}
+          axisLine={{ stroke: '#9ca3af' }}
+          tickLine={{ stroke: '#9ca3af' }}
           label={{ 
             value: 'Место', 
             angle: -90, 
             position: 'insideLeft',
-            style: { textAnchor: 'middle' }
+            style: { textAnchor: 'middle', fill: '#4b5563', fontSize: 12, fontWeight: 500 }
           }}
         />
         <Tooltip content={<CustomTooltip />} />
@@ -117,13 +116,13 @@ const AthletePerformanceChart: React.FC<AthletePerformanceChartProps> = ({ athle
             type="monotone"
             dataKey={`athlete${athlete.number}`}
             stroke={athlete.color}
-            strokeWidth={2}
-            dot={{ r: 5, strokeWidth: 2, fill: "#fff" }}
-            activeDot={{ r: 7 }}
+            strokeWidth={2.5}
+            dot={{ r: 5, strokeWidth: 2, fill: "#ffffff", stroke: athlete.color }}
+            activeDot={{ r: 7, strokeWidth: 2 }}
           />
         ))}
         
-        <ReferenceLine y={3.5} stroke="#718096" strokeDasharray="3 3" />
+        <ReferenceLine y={3.5} stroke="#94a3b8" strokeDasharray="3 3" />
       </LineChart>
     </ResponsiveContainer>
   );

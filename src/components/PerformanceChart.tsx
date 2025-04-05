@@ -39,28 +39,28 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
             data={chartData}
             margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#eaeaea" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" />
             <XAxis 
               dataKey="displayDate" 
-              tick={{ fontSize: 12 }}
-              axisLine={{ stroke: '#e2e8f0' }}
-              tickLine={{ stroke: '#e2e8f0' }}
+              tick={{ fontSize: 12, fill: "#4b5563" }}
+              axisLine={{ stroke: '#9ca3af' }}
+              tickLine={{ stroke: '#9ca3af' }}
             />
             <YAxis 
               domain={[minTime, maxTime]}
               tickFormatter={(value) => formatTime(value)}
-              tick={{ fontSize: 12 }}
-              axisLine={{ stroke: '#e2e8f0' }}
-              tickLine={{ stroke: '#e2e8f0' }}
+              tick={{ fontSize: 12, fill: "#4b5563" }}
+              axisLine={{ stroke: '#9ca3af' }}
+              tickLine={{ stroke: '#9ca3af' }}
               yAxisId="left"
             />
             {sessions.some(s => s.heartRate) && (
               <YAxis 
                 orientation="right"
                 yAxisId="right"
-                tick={{ fontSize: 12 }}
-                axisLine={{ stroke: '#e2e8f0' }}
-                tickLine={{ stroke: '#e2e8f0' }}
+                tick={{ fontSize: 12, fill: "#4b5563" }}
+                axisLine={{ stroke: '#9ca3af' }}
+                tickLine={{ stroke: '#9ca3af' }}
               />
             )}
             <Tooltip 
@@ -70,16 +70,24 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
                 return value;
               }}
               labelFormatter={(label) => `Дата: ${label}`}
+              contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '0.375rem' }}
+              itemStyle={{ color: '#1f2937' }}
+              labelStyle={{ color: '#4b5563', fontWeight: 'bold' }}
             />
-            <Legend verticalAlign="bottom" height={36} />
+            <Legend 
+              verticalAlign="bottom" 
+              height={36}
+              wrapperStyle={{ paddingTop: '10px' }}
+              formatter={(value) => <span className="text-gray-700">{value}</span>}
+            />
             <Line 
               type="monotone" 
               dataKey="time" 
               name="Время" 
               stroke="#2563eb" 
               strokeWidth={2}
-              dot={{ r: 4, strokeWidth: 2 }}
-              activeDot={{ r: 6 }}
+              dot={{ r: 4, strokeWidth: 2, fill: "#ffffff" }}
+              activeDot={{ r: 6, fill: "#2563eb" }}
               yAxisId="left"
             />
             {sessions.some(s => s.heartRate) && (
@@ -90,7 +98,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
                 stroke="#ef4444" 
                 strokeWidth={2}
                 yAxisId="right"
-                dot={{ r: 4, strokeWidth: 2 }}
+                dot={{ r: 4, strokeWidth: 2, fill: "#ffffff" }}
               />
             )}
           </LineChart>

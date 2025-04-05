@@ -10,17 +10,13 @@ import {
   mockAthletes, 
   mockLiveRaceData, 
   mockProbabilityAnalysis,
-  mockRaceResults,
   formatTime
 } from '@/data/mockData';
 import { Athlete, PositionProbability, TopNProbability } from '@/types';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import RaceResultsTable from '@/components/RaceResultsTable';
 import { ChartContainer } from '@/components/ui/chart';
 import PerformanceChart from '@/components/PerformanceChart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import AthletePerformanceChart from '@/components/AthletePerformanceChart';
 
 const RaceAnalysis = () => {
@@ -148,13 +144,6 @@ const RaceAnalysis = () => {
     }
   }, [connectionState, sendMessage]);
 
-  // Mock season statistics
-  const seasonStats = [
-    { distance: '100м', races: 7, wins: 3, podiums: 5, bestTime: '10.42', worstTime: '10.68', avgTime: '10.55' },
-    { distance: '200м', races: 5, wins: 2, podiums: 4, bestTime: '20.85', worstTime: '21.24', avgTime: '21.02' },
-    { distance: '400м', races: 2, wins: 0, podiums: 1, bestTime: '46.82', worstTime: '47.35', avgTime: '47.08' }
-  ];
-
   // Extract all athletes from live race data
   const raceAthletes = liveRaceData?.athletes || [];
 
@@ -179,9 +168,9 @@ const RaceAnalysis = () => {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Комплексный анализ забегов</h1>
-          <p className="text-muted-foreground mt-2">
-            Анализ соревновательных показателей, вероятностей и статистики за сезон
+          <h1 className="text-3xl font-bold tracking-tight">Комплексный анализ забегов</h1>
+          <p className="text-muted-foreground mt-2 leading-relaxed">
+            Анализ соревновательных показателей, вероятностей и результатов в реальном времени
           </p>
         </div>
 
@@ -206,9 +195,9 @@ const RaceAnalysis = () => {
           
           {/* Performance Chart */}
           <div className="lg:col-span-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Динамика результатов</CardTitle>
+            <Card className="overflow-hidden border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-medium">Динамика результатов</CardTitle>
               </CardHeader>
               <CardContent className="h-[400px]">
                 <AthletePerformanceChart athletes={performanceData} />
@@ -254,35 +243,35 @@ const RaceAnalysis = () => {
                     </CardHeader>
                     <CardContent>
                       {/* Athlete current status */}
-                      <div className="text-sm text-muted-foreground mt-1 space-y-1 mb-4">
-                        <div>
-                          <span className="inline-block w-28">Текущая позиция:</span>
-                          <span className="font-medium">{athlete.currentPosition}</span>
+                      <div className="text-sm text-slate-600 dark:text-slate-300 mt-1 space-y-1.5 mb-4">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Текущая позиция:</span>
+                          <span>{athlete.currentPosition}</span>
                         </div>
-                        <div>
-                          <span className="inline-block w-28">Текущая скорость:</span>
-                          <span className="font-medium">{athlete.currentSpeed.toFixed(1)} м/с</span>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Текущая скорость:</span>
+                          <span>{athlete.currentSpeed.toFixed(1)} м/с</span>
                         </div>
-                        <div>
-                          <span className="inline-block w-28">Пройдено:</span>
-                          <span className="font-medium">{athlete.currentDistance.toFixed(1)} м</span>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Пройдено:</span>
+                          <span>{athlete.currentDistance.toFixed(1)} м</span>
                         </div>
                         {athleteDetails.reactionTime !== undefined && (
-                          <div>
-                            <span className="inline-block w-28">Реакция:</span>
-                            <span className="font-medium">{athleteDetails.reactionTime.toFixed(3)} с</span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">Реакция:</span>
+                            <span>{athleteDetails.reactionTime.toFixed(3)} с</span>
                           </div>
                         )}
                         {athleteDetails.maxSpeed !== undefined && (
-                          <div>
-                            <span className="inline-block w-28">Макс. скорость:</span>
-                            <span className="font-medium">{athleteDetails.maxSpeed.toFixed(1)} м/с</span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">Макс. скорость:</span>
+                            <span>{athleteDetails.maxSpeed.toFixed(1)} м/с</span>
                           </div>
                         )}
                       </div>
                       
                       {/* Probability tables */}
-                      <div className="space-y-6">
+                      <div className="space-y-5">
                         <div>
                           <h4 className="font-medium mb-2 text-sm">Вероятности позиций</h4>
                           <ProbabilityTable 
@@ -326,43 +315,6 @@ const RaceAnalysis = () => {
                 );
               })}
             </div>
-          </div>
-          
-          {/* Season statistics table */}
-          <div className="lg:col-span-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Статистика забегов за сезон</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Дистанция</TableHead>
-                      <TableHead className="text-right">Забеги</TableHead>
-                      <TableHead className="text-right">Победы</TableHead>
-                      <TableHead className="text-right">Подиумы</TableHead>
-                      <TableHead className="text-right">Лучшее время</TableHead>
-                      <TableHead className="text-right">Худшее время</TableHead>
-                      <TableHead className="text-right">Среднее время</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {seasonStats.map((stat) => (
-                      <TableRow key={stat.distance}>
-                        <TableCell className="font-medium">{stat.distance}</TableCell>
-                        <TableCell className="text-right">{stat.races}</TableCell>
-                        <TableCell className="text-right">{stat.wins}</TableCell>
-                        <TableCell className="text-right">{stat.podiums}</TableCell>
-                        <TableCell className="text-right font-mono">{stat.bestTime}</TableCell>
-                        <TableCell className="text-right font-mono">{stat.worstTime}</TableCell>
-                        <TableCell className="text-right font-mono">{stat.avgTime}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>

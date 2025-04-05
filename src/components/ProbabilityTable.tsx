@@ -45,8 +45,8 @@ const ProbabilityTable: React.FC<ProbabilityTableProps> = ({ probabilities, type
         <Table>
           <TableHeader>
             <TableRow className="border-b border-border/40">
-              <TableHead className="py-1 px-1">Позиция</TableHead>
-              <TableHead className="text-right py-1 px-1">%</TableHead>
+              <TableHead className="py-1 px-2">Позиция</TableHead>
+              <TableHead className="text-right py-1 px-2">%</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -61,8 +61,8 @@ const ProbabilityTable: React.FC<ProbabilityTableProps> = ({ probabilities, type
               
               return (
                 <TableRow key={key} className="border-b border-border/20">
-                  <TableCell className="py-1 px-1">{formatPositionDescription(item)}</TableCell>
-                  <TableCell className="text-right font-mono py-1 px-1">
+                  <TableCell className="py-1 px-2">{formatPositionDescription(item)}</TableCell>
+                  <TableCell className="text-right font-mono py-1 px-2">
                     {(probability * 100).toFixed(0)}%
                   </TableCell>
                 </TableRow>
@@ -76,11 +76,11 @@ const ProbabilityTable: React.FC<ProbabilityTableProps> = ({ probabilities, type
 
   return (
     <Card>
-      <CardContent className="p-6">
+      <CardContent className="p-4">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Позиция</TableHead>
+              <TableHead className="w-2/3">Позиция</TableHead>
               <TableHead className="text-right">Вероятность</TableHead>
               <TableHead className="text-right">Процент</TableHead>
             </TableRow>
