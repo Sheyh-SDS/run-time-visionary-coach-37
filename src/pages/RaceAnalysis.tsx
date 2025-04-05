@@ -6,7 +6,6 @@ import LiveRaceViewer from '@/components/LiveRaceViewer';
 import ProbabilityTable from '@/components/ProbabilityTable';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { useWebSocket } from '@/hooks/use-websocket';
-import ProbabilityChart from '@/components/ProbabilityChart';
 import { 
   mockAthletes, 
   mockLiveRaceData, 
@@ -18,6 +17,7 @@ import { Athlete, PositionProbability, TopNProbability } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import RaceResultsTable from '@/components/RaceResultsTable';
 
 const RaceAnalysis = () => {
   const { isConnected } = useSimulation();
@@ -119,8 +119,8 @@ const RaceAnalysis = () => {
     { distance: '400м', races: 2, wins: 0, podiums: 1, bestTime: '46.82', worstTime: '47.35', avgTime: '47.08' }
   ];
 
-  // Get the selected athlete data
-  const selectedAthlete = mockAthletes.find(athlete => athlete.id === selectedAthleteId);
+  // Extract all athletes from live race data
+  const raceAthletes = liveRaceData?.athletes || [];
 
   return (
     <Layout>
@@ -142,7 +142,7 @@ const RaceAnalysis = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left column: Race visualization */}
+          {/* Race visualization */}
           <div className="lg:col-span-3">
             <LiveRaceViewer 
               liveRaceData={liveRaceData}
@@ -208,6 +208,77 @@ const RaceAnalysis = () => {
             </div>
           </div>
           
+          {/* All Athletes Information */}
+          <div className="lg:col-span-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Участники забега</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {raceAthletes.map((athlete) => {
+                    // Find the matching athlete in mockAthletes to get full details
+                    const athleteDetails = mockAthletes.find(a => a.id === athlete.athleteId) || {
+                      id: athlete.athleteId,
+                      name: athlete.name,
+                      age: 0,
+                      gender: 'other' as const,
+                      specialization: [],
+                      personalBests: {},
+                      number: athlete.number,
+                      jerseyColor: athlete.jerseyColor
+                    };
+                    
+                    return (
+                      <Card key={athlete.athleteId} className="overflow-hidden">
+                        <CardContent className="p-4">
+                          <div className="flex items-start space-x-3">
+                            <div 
+                              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 mt-1"
+                              style={{ backgroundColor: athlete.jerseyColor || '#cccccc' }}
+                            >
+                              {athlete.number}
+                            </div>
+                            <div>
+                              <h3 className="font-medium">{athlete.name}</h3>
+                              
+                              <div className="text-sm text-muted-foreground mt-1 space-y-1">
+                                <div>
+                                  <span className="inline-block w-28">Текущая позиция:</span>
+                                  <span className="font-medium">{athlete.currentPosition}</span>
+                                </div>
+                                <div>
+                                  <span className="inline-block w-28">Текущая скорость:</span>
+                                  <span className="font-medium">{athlete.currentSpeed.toFixed(1)} м/с</span>
+                                </div>
+                                <div>
+                                  <span className="inline-block w-28">Пройдено:</span>
+                                  <span className="font-medium">{athlete.currentDistance.toFixed(1)} м</span>
+                                </div>
+                                {athleteDetails.reactionTime !== undefined && (
+                                  <div>
+                                    <span className="inline-block w-28">Реакция:</span>
+                                    <span className="font-medium">{athleteDetails.reactionTime.toFixed(3)} с</span>
+                                  </div>
+                                )}
+                                {athleteDetails.maxSpeed !== undefined && (
+                                  <div>
+                                    <span className="inline-block w-28">Макс. скорость:</span>
+                                    <span className="font-medium">{athleteDetails.maxSpeed.toFixed(1)} м/с</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
           {/* Season statistics table */}
           <div className="lg:col-span-3">
             <Card>
@@ -241,54 +312,6 @@ const RaceAnalysis = () => {
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Athlete information section */}
-          <div className="lg:col-span-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Информация о спортсмене</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {selectedAthlete && (
-                  <div className="flex items-start gap-4 flex-wrap md:flex-nowrap">
-                    <div className="flex items-center space-x-4">
-                      <div 
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold"
-                        style={{ backgroundColor: selectedAthlete.jerseyColor || '#cccccc' }}
-                      >
-                        {selectedAthlete.number || '?'}
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold">{selectedAthlete.name}</h3>
-                        <p className="text-muted-foreground">
-                          {selectedAthlete.age} лет, {selectedAthlete.gender === 'male' ? 'муж' : selectedAthlete.gender === 'female' ? 'жен' : 'др'}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mt-4 md:mt-0 ml-0 md:ml-auto">
-                      <div>
-                        <span className="text-muted-foreground block">Реакция:</span>
-                        <span className="font-medium">{selectedAthlete.reactionTime?.toFixed(3) || 'N/A'} сек</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block">Ускорение:</span>
-                        <span className="font-medium">{selectedAthlete.acceleration?.toFixed(1) || 'N/A'} м/с²</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block">Макс. скорость:</span>
-                        <span className="font-medium">{selectedAthlete.maxSpeed?.toFixed(1) || 'N/A'} м/с</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block">Замедление:</span>
-                        <span className="font-medium">{selectedAthlete.deceleration?.toFixed(1) || 'N/A'} м/с²</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </div>
