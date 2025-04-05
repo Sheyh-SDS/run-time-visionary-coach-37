@@ -1,6 +1,5 @@
 
-import { useEffect, useState, useCallback } from 'react';
-import * as Centrifuge from 'centrifuge';
+import { Centrifuge } from 'centrifuge';
 
 export type WebSocketState = 'connecting' | 'open' | 'closed' | 'error';
 
@@ -9,18 +8,18 @@ export interface WebSocketOptions {
   onOpen?: () => void;
   onMessage?: (message: any) => void;
   onClose?: () => void;
-  onError?: (error: Event) => void;
+  onError?: (error: any) => void;
   onSubscribe?: (channel: string) => void;
   reconnectOnMount?: boolean;
 }
 
 export class WebSocketService {
-  private centrifuge: Centrifuge.Centrifuge | null = null;
+  private centrifuge: Centrifuge | null = null;
   private url: string | undefined;
   private onOpen: (() => void) | undefined;
   private onMessage: ((data: any) => void) | undefined;
   private onClose: (() => void) | undefined;
-  private onError: ((error: Event) => void) | undefined;
+  private onError: ((error: any) => void) | undefined;
   private onSubscribe: ((channel: string) => void) | undefined;
   private subscriptions: Map<string, any> = new Map();
   private _state: WebSocketState = 'closed';
@@ -58,7 +57,7 @@ export class WebSocketService {
 
     try {
       // Create a new Centrifuge instance
-      this.centrifuge = new Centrifuge.Centrifuge(url);
+      this.centrifuge = new Centrifuge(url);
 
       this.centrifuge.on('connecting', () => {
         this._state = 'connecting';
@@ -92,7 +91,7 @@ export class WebSocketService {
     } catch (error) {
       console.error('Failed to create Centrifugo connection:', error);
       this._state = 'error';
-      if (this.onError) this.onError(new Event('error'));
+      if (this.onError) this.onError(error);
       this.notifyStateChange();
     }
   }
@@ -168,10 +167,11 @@ export class WebSocketService {
   }
 
   public getConnectionId(): string | null {
-    return this.centrifuge?.getClientId() || null;
+    if (!this.centrifuge) return null;
+    return this.centrifuge.getClient() ? this.centrifuge.getClient().id : null;
   }
 
-  // Add the missing methods needed by simulationApi.ts
+  // Add missing methods needed by simulationApi.ts
 
   public onStateChange(callback: (state: WebSocketState) => void): () => void {
     this.stateChangeListeners.push(callback);
