@@ -149,13 +149,40 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           if (debug) {
             console.log(`Reconnecting to ${options.url}...`);
           }
-          webSocketService.connect(options.url);
+          
+          // Добавляем токен аутентификации прямо в URL, если он указан
+          let connectionUrl = options.url;
+          if (token) {
+            // Проверяем, есть ли уже параметры в URL
+            const hasParams = connectionUrl.includes('?');
+            connectionUrl = `${connectionUrl}${hasParams ? '&' : '?'}token=${encodeURIComponent(token)}`;
+            
+            if (debug) {
+              console.log(`Added token to connection URL: ${connectionUrl}`);
+            }
+          }
+          
+          webSocketService.connect(connectionUrl);
         }
       }, delay);
     };
 
-    if (options.url && options.reconnectOnMount) {
-      webSocketService.connect(options.url);
+    if (options.url) {
+      let connectionUrl = options.url;
+      
+      // Если указан токен, добавляем его в URL
+      if (token && options.reconnectOnMount) {
+        const hasParams = connectionUrl.includes('?');
+        connectionUrl = `${connectionUrl}${hasParams ? '&' : '?'}token=${encodeURIComponent(token)}`;
+        
+        if (debug) {
+          console.log(`Connecting with token in URL: ${connectionUrl}`);
+        }
+      }
+      
+      if (options.reconnectOnMount) {
+        webSocketService.connect(connectionUrl);
+      }
     }
 
     return () => {
@@ -248,11 +275,23 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     if (url || options.url) {
       reconnectAttemptsRef.current = 0;
       setLastError(null);
-      webSocketService.connect(url || options.url || '');
+      
+      // Добавляем токен аутентификации прямо в URL, если он указан
+      let connectionUrl = url || options.url || '';
+      if (token) {
+        const hasParams = connectionUrl.includes('?');
+        connectionUrl = `${connectionUrl}${hasParams ? '&' : '?'}token=${encodeURIComponent(token)}`;
+        
+        if (debug) {
+          console.log(`Connecting with token in URL: ${connectionUrl}`);
+        }
+      }
+      
+      webSocketService.connect(connectionUrl);
     } else {
       console.error('No WebSocket URL provided');
     }
-  }, [options.url]);
+  }, [options.url, token, debug]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimerRef.current !== null) {
