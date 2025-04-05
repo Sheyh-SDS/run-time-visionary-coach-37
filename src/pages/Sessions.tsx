@@ -1,44 +1,16 @@
 
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
-import PerformanceParamsCard from '@/components/PerformanceParamsCard';
-import { RunSession, Athlete } from '@/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import SessionDetail from '@/components/SessionDetail';
+import SplitTimesChart from '@/components/SplitTimesChart';
+import { RunSession } from '@/types';
 import { mockAthletes, mockRunSessions, formatTime } from '@/data/mockData';
-import SessionFilters from '@/components/sessions/SessionFilters';
-import SessionList from '@/components/sessions/SessionList';
-import SessionTabs from '@/components/sessions/SessionTabs';
-
-// Mock performance history data - in a real app, this would come from an API
-const mockPerformanceHistory = [
-  {
-    date: '2024-01-05',
-    reactionTime: 0.23,
-    acceleration: 3.2,
-    maxSpeed: 9.4,
-    deceleration: 2.8
-  },
-  {
-    date: '2024-02-10',
-    reactionTime: 0.21,
-    acceleration: 3.4,
-    maxSpeed: 9.6,
-    deceleration: 2.9
-  },
-  {
-    date: '2024-03-15',
-    reactionTime: 0.20,
-    acceleration: 3.6,
-    maxSpeed: 9.8,
-    deceleration: 3.0
-  },
-  {
-    date: '2024-04-01',
-    reactionTime: 0.19,
-    acceleration: 3.8,
-    maxSpeed: 10.0,
-    deceleration: 3.1
-  }
-];
 
 const Sessions = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -59,10 +31,11 @@ const Sessions = () => {
     return matchesSearch && matchesAthlete;
   });
 
-  // Get selected athlete
-  const selectedAthlete = athleteFilter !== 'all' 
-    ? mockAthletes.find(a => a.id === athleteFilter) 
-    : null;
+  // Get athlete name by ID
+  const getAthleteName = (athleteId: string) => {
+    const athlete = mockAthletes.find(a => a.id === athleteId);
+    return athlete ? athlete.name : 'Неизвестный спортсмен';
+  };
 
   // Sort sessions by date (newest first)
   const sortedSessions = [...filteredSessions].sort(
@@ -81,30 +54,119 @@ const Sessions = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-1 space-y-4">
-            <SessionFilters 
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              athleteFilter={athleteFilter}
-              setAthleteFilter={setAthleteFilter}
-              athletes={mockAthletes}
-            />
+            <Card>
+              <CardHeader>
+                <CardTitle>Фильтры</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Input 
+                    placeholder="Поиск по дистанции, локации, времени..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Select
+                    value={athleteFilter}
+                    onValueChange={setAthleteFilter}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите спортсмена" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Все спортсмены</SelectItem>
+                      {mockAthletes.map(athlete => (
+                        <SelectItem key={athlete.id} value={athlete.id}>
+                          {athlete.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
 
-            <SessionList 
-              sessions={sortedSessions} 
-              onSelectSession={setSelectedSession}
-            />
-
-            {selectedAthlete && (
-              <PerformanceParamsCard athlete={selectedAthlete} />
-            )}
+            <Card>
+              <CardHeader>
+                <CardTitle>Список забегов</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Дата</TableHead>
+                        <TableHead>Дистанция</TableHead>
+                        <TableHead>Время</TableHead>
+                        <TableHead>Тип</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedSessions.map(session => (
+                        <TableRow 
+                          key={session.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setSelectedSession(session)}
+                        >
+                          <TableCell className="font-medium">
+                            {new Date(session.date).toLocaleDateString('ru-RU', {
+                              day: '2-digit',
+                              month: '2-digit'
+                            })}
+                          </TableCell>
+                          <TableCell>{session.distance}м</TableCell>
+                          <TableCell>{formatTime(session.time)}</TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              session.type === 'race' ? 'default' : 
+                              session.type === 'training' ? 'secondary' : 'outline'
+                            }>
+                              {session.type === 'race' ? 'Соревн.' : 
+                               session.type === 'training' ? 'Трен.' : 'Симул.'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {sortedSessions.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
+                            Забеги не найдены
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="lg:col-span-2">
-            <SessionTabs 
-              selectedSession={selectedSession}
-              selectedAthlete={selectedAthlete}
-              performanceHistoryData={mockPerformanceHistory}
-            />
+            {selectedSession ? (
+              <Tabs defaultValue="details" className="h-full">
+                <TabsList className="grid grid-cols-2 mb-4">
+                  <TabsTrigger value="details">Детали забега</TabsTrigger>
+                  <TabsTrigger value="splits">Анализ сплитов</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="details" className="m-0">
+                  <SessionDetail session={selectedSession} />
+                </TabsContent>
+                
+                <TabsContent value="splits" className="m-0">
+                  <SplitTimesChart session={selectedSession} />
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <Card className="h-full">
+                <CardContent className="flex items-center justify-center h-64">
+                  <div className="text-center text-muted-foreground">
+                    Выберите забег из списка для просмотра деталей
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>

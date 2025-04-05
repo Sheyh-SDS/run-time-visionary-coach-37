@@ -37,7 +37,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
-            margin={{ top: 5, right: 30, left: 25, bottom: 65 }} // Increased bottom margin
+            margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#eaeaea" />
             <XAxis 
@@ -45,10 +45,6 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
               tick={{ fontSize: 12 }}
               axisLine={{ stroke: '#e2e8f0' }}
               tickLine={{ stroke: '#e2e8f0' }}
-              height={60} // Increased height
-              angle={-45}
-              textAnchor="end"
-              dy={10} // Added vertical adjustment
             />
             <YAxis 
               domain={[minTime, maxTime]}
@@ -57,7 +53,6 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
               axisLine={{ stroke: '#e2e8f0' }}
               tickLine={{ stroke: '#e2e8f0' }}
               yAxisId="left"
-              width={60}
             />
             {sessions.some(s => s.heartRate) && (
               <YAxis 
@@ -66,7 +61,6 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
                 tick={{ fontSize: 12 }}
                 axisLine={{ stroke: '#e2e8f0' }}
                 tickLine={{ stroke: '#e2e8f0' }}
-                width={35}
               />
             )}
             <Tooltip 
@@ -77,7 +71,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
               }}
               labelFormatter={(label) => `Дата: ${label}`}
             />
-            <Legend verticalAlign="bottom" height={46} /> {/* Increased legend height */}
+            <Legend verticalAlign="bottom" height={36} />
             <Line 
               type="monotone" 
               dataKey="time" 

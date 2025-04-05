@@ -141,13 +141,13 @@ const SessionDetail: React.FC<SessionDetailProps> = ({ session, athlete }) => {
           )}
         </div>
         
-        {athlete && athlete.reactionTime !== undefined && (
+        {athlete && (
           <>
             <Separator className="my-4" />
             <h3 className="text-sm font-medium mb-2">Характеристики бегуна</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {athlete.reactionTime !== undefined && (
-                <div className="p-3 bg-muted/50 rounded-md">
+              {athlete.reactionTime && (
+                <div className="p-3 bg-secondary rounded-md">
                   <div className="flex items-center text-muted-foreground text-xs mb-1">
                     <Timer className="h-3 w-3 mr-1" />
                     <span>Время реакции</span>
@@ -156,8 +156,8 @@ const SessionDetail: React.FC<SessionDetailProps> = ({ session, athlete }) => {
                 </div>
               )}
               
-              {athlete.acceleration !== undefined && (
-                <div className="p-3 bg-muted/50 rounded-md">
+              {athlete.acceleration && (
+                <div className="p-3 bg-secondary rounded-md">
                   <div className="flex items-center text-muted-foreground text-xs mb-1">
                     <Zap className="h-3 w-3 mr-1" />
                     <span>Ускорение</span>
@@ -166,8 +166,8 @@ const SessionDetail: React.FC<SessionDetailProps> = ({ session, athlete }) => {
                 </div>
               )}
               
-              {athlete.maxSpeed !== undefined && (
-                <div className="p-3 bg-muted/50 rounded-md">
+              {athlete.maxSpeed && (
+                <div className="p-3 bg-secondary rounded-md">
                   <div className="flex items-center text-muted-foreground text-xs mb-1">
                     <Gauge className="h-3 w-3 mr-1" />
                     <span>Макс. скорость</span>
@@ -176,8 +176,8 @@ const SessionDetail: React.FC<SessionDetailProps> = ({ session, athlete }) => {
                 </div>
               )}
               
-              {athlete.deceleration !== undefined && (
-                <div className="p-3 bg-muted/50 rounded-md">
+              {athlete.deceleration && (
+                <div className="p-3 bg-secondary rounded-md">
                   <div className="flex items-center text-muted-foreground text-xs mb-1">
                     <TrendingDown className="h-3 w-3 mr-1" />
                     <span>Замедление</span>
@@ -204,7 +204,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({ session, athlete }) => {
           <h3 className="text-sm font-medium mb-2">Сплиты</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
             {session.splits.map((split, index) => (
-              <div key={index} className="bg-muted/50 p-2 rounded-md text-center">
+              <div key={index} className="bg-secondary p-2 rounded-md text-center">
                 <div className="text-xs text-muted-foreground">Сплит {index + 1}</div>
                 <div className="font-medium">{formatTime(split)}</div>
               </div>
