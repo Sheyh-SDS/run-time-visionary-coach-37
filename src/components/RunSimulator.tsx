@@ -2,13 +2,14 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Athlete, RunSession, SimulationSettings } from '@/types';
-import { generateRunningSession, formatTime } from '@/data/mockData';
+import { formatTime } from '@/data/mockData';
+import { simulationApi } from '@/services/simulationApi';
+import { Loader2 } from 'lucide-react';
 
 interface RunSimulatorProps {
   athletes: Athlete[];
@@ -17,6 +18,7 @@ interface RunSimulatorProps {
 
 const RunSimulator: React.FC<RunSimulatorProps> = ({ athletes, onSimulate }) => {
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>("");
+  const [isSimulating, setIsSimulating] = useState(false);
   const [settings, setSettings] = useState<SimulationSettings>({
     distance: 800,
     basePace: 4.0, // minutes per km
@@ -27,39 +29,25 @@ const RunSimulator: React.FC<RunSimulatorProps> = ({ athletes, onSimulate }) => 
     competitionFactor: 0.5 // 50% competition impact
   });
 
-  const handleSimulate = () => {
+  const handleSimulate = async () => {
     if (!selectedAthleteId) return;
     
-    // Convert pace from minutes per km to total time in seconds for the distance
-    const paceInSecondsPerMeter = (settings.basePace * 60) / 1000;
-    const baseTimeForDistance = paceInSecondsPerMeter * settings.distance;
+    setIsSimulating(true);
     
-    // Apply terrain and weather factors
-    let adjustedTime = baseTimeForDistance;
-    
-    // Terrain factors
-    if (settings.terrainType === 'road') adjustedTime *= 1.02;
-    else if (settings.terrainType === 'trail') adjustedTime *= 1.1;
-    else if (settings.terrainType === 'hills') adjustedTime *= 1.15;
-    
-    // Weather factors
-    if (settings.weatherConditions === 'moderate') adjustedTime *= 1.03;
-    else if (settings.weatherConditions === 'challenging') adjustedTime *= 1.08;
-    else if (settings.weatherConditions === 'extreme') adjustedTime *= 1.15;
-    else if (settings.weatherConditions === 'ideal') adjustedTime *= 0.98;
-    
-    // Competition factor - can improve time
-    adjustedTime *= (1 - (settings.competitionFactor * 0.05));
-    
-    // Generate the running session
-    const simulatedSession = generateRunningSession(
-      selectedAthleteId,
-      settings.distance,
-      adjustedTime,
-      settings.variability
-    );
-    
-    onSimulate(simulatedSession);
+    try {
+      // Request simulation from the API
+      const simulatedSession = await simulationApi.requestSimulation(
+        selectedAthleteId,
+        settings
+      );
+      
+      // Pass the session to the parent component
+      onSimulate(simulatedSession);
+    } catch (error) {
+      console.error('Simulation error:', error);
+    } finally {
+      setIsSimulating(false);
+    }
   };
 
   return (
@@ -215,10 +203,17 @@ const RunSimulator: React.FC<RunSimulatorProps> = ({ athletes, onSimulate }) => 
           
           <Button 
             onClick={handleSimulate}
-            disabled={!selectedAthleteId}
+            disabled={!selectedAthleteId || isSimulating}
             className="mt-2"
           >
-            Запустить симуляцию
+            {isSimulating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Симуляция...
+              </>
+            ) : (
+              "Запустить симуляцию"
+            )}
           </Button>
         </div>
       </CardContent>
