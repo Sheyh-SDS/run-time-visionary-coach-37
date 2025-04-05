@@ -27,27 +27,15 @@ class WebSocketService {
   private lastError: WebSocketError | null = null;
   private clientId: string | null = null;
 
-  // Connect to WebSocket server with optional connection parameters
-  connect(url: string, params: Record<string, string> = {}): void {
+  // Connect to WebSocket server
+  connect(url: string): void {
     if (this.socket?.readyState === WebSocket.OPEN) {
       console.log('WebSocket already connected');
       return;
     }
 
     try {
-      // Append connection parameters to URL if provided
-      let connectionUrl = url;
-      const urlParams = new URLSearchParams(params);
-      const queryString = urlParams.toString();
-      
-      if (queryString && !url.includes('?')) {
-        connectionUrl = `${url}?${queryString}`;
-      } else if (queryString) {
-        connectionUrl = `${url}&${queryString}`;
-      }
-      
-      console.log(`Connecting to WebSocket at ${connectionUrl}`);
-      this.socket = new WebSocket(connectionUrl);
+      this.socket = new WebSocket(url);
       this.registerSocketListeners();
       this.notifyStateChange('connecting');
     } catch (error) {
@@ -83,8 +71,7 @@ class WebSocketService {
             console.error('Centrifugo error:', data.error);
             this.lastError = {
               message: data.error.message || 'Centrifugo error',
-              code: data.error.code,
-              reason: data.error.message
+              code: data.error.code
             };
             
             // Show toast for errors

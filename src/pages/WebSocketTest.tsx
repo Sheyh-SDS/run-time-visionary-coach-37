@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Toggle } from "@/components/ui/toggle";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const WebSocketTest: React.FC = () => {
   // WebSocket hook
@@ -31,12 +30,9 @@ const WebSocketTest: React.FC = () => {
   const [cmdParams, setCmdParams] = useState('');
   const [debugMode, setDebugMode] = useState(true);
   const [autoSubscribe, setAutoSubscribe] = useState(false);
-  const [connectionMethod, setConnectionMethod] = useState<'command' | 'params'>('command');
-  const [advancedMode, setAdvancedMode] = useState(false);
-  const [infoFormat, setInfoFormat] = useState<'conn' | 'sub' | 'common'>('conn');
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Use the WebSocket hook with the selected connection method
+  // Use the WebSocket hook
   const { 
     connectionState, 
     isConnected,
@@ -50,7 +46,6 @@ const WebSocketTest: React.FC = () => {
   } = useWebSocket({
     debug: debugMode,
     autoSubscribeChannels: autoSubscribe ? [channel] : [],
-    connectWithParams: connectionMethod === 'params',
   });
 
   // Add log entry with timestamp
@@ -101,7 +96,6 @@ const WebSocketTest: React.FC = () => {
     setLogs([]);
   };
 
-  // Connect with advanced options for Centrifugo
   const connectWebSocket = () => {
     if (!url) {
       addLog("WebSocket URL is required", true);
@@ -113,18 +107,7 @@ const WebSocketTest: React.FC = () => {
       return;
     }
 
-    // Use a URL without parameters for direct connection method
-    let connectUrl = url;
-    
-    // For parameter-based connection, we'll set the token in the hook
-    if (connectionMethod === 'params') {
-      addLog(`Connecting with token in URL parameters`);
-      // The hook will handle adding the token
-    } else {
-      addLog(`Connecting without parameters, will send token via command after connection`);
-    }
-    
-    connect(connectUrl);
+    connect(url);
   };
 
   const sendAuthentication = () => {
@@ -367,65 +350,6 @@ const WebSocketTest: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Get proper code sample based on selected info format
-  const getSelectedInfoFormat = () => {
-    switch(infoFormat) {
-      case 'conn':
-        return `// 1. Connect to Centrifugo in URL params (recommended for error 3501)
-const socket = new WebSocket("wss://your-server.com/connection/websocket?token=JWT_TOKEN_HERE");
-
-// 2. After connection established, listen for messages
-socket.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  console.log("Received:", data);
-};`;
-      case 'sub':
-        return `// After successful connection and authentication
-// Send subscription command
-const subscribeCommand = {
-  "id": 2,
-  "method": "subscribe",
-  "params": {
-    "channel": "news"
-  }
-};
-
-socket.send(JSON.stringify(subscribeCommand));
-
-// Handle subscription push messages
-socket.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  
-  // Check for push messages from subscriptions
-  if (data.push && data.push.channel) {
-    console.log("Message from channel:", data.push.channel);
-    console.log("Data:", data.push.data);
-  }
-};`;
-      case 'common':
-        return `// Common Centrifugo error codes:
-// 3501 - Bad Request (wrong params or token format)
-// 3502 - Stale connection (expired or invalid token)
-// 3503 - Unauthorized (missing or invalid credentials)
-// 3504 - Rate Limit (too many requests)
-// 3505 - Forbidden (access denied)
-
-// JWT token format for Centrifugo:
-{
-  // Standard claims
-  "sub": "user-123",   // Subject (user ID)
-  "exp": 1617304605,   // Expiration (timestamp)
-  
-  // Centrifugo-specific claims
-  "channels": ["news", "chat"],  // Allowed channels
-  "info": {                      // User info (optional)
-    "name": "John",
-    "avatar": "url"
-  }
-}`;
-    }
-  };
-
   return (
     <Layout>
       <div className="container mx-auto py-4">
@@ -490,25 +414,6 @@ socket.onmessage = (event) => {
                 />
               </div>
               
-              {/* Connection method selection */}
-              <div className="space-y-2">
-                <Label>Connection Method</Label>
-                <RadioGroup 
-                  value={connectionMethod} 
-                  onValueChange={(value) => setConnectionMethod(value as 'command' | 'params')}
-                  className="flex flex-col space-y-1"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="command" id="method-command" />
-                    <Label htmlFor="method-command">Connect first, then send token with command (Default)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="params" id="method-params" />
-                    <Label htmlFor="method-params">Send token in URL parameters (Try for error 3501)</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              
               <div className="flex items-center justify-between space-x-2 pt-2">
                 <div className="flex items-center space-x-2">
                   <Switch
@@ -530,47 +435,6 @@ socket.onmessage = (event) => {
                 </div>
               </div>
 
-              {/* Advanced settings toggle */}
-              <div className="flex items-center justify-between pt-1">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setAdvancedMode(!advancedMode)}
-                  className="text-xs"
-                >
-                  {advancedMode ? "Hide Advanced Settings" : "Show Advanced Settings"}
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('debug', 'true');
-                    url.pathname = '/websocket';
-                    window.history.pushState({}, '', url.toString());
-                    window.location.reload();
-                  }}
-                  className="text-xs"
-                >
-                  Debug Mode
-                </Button>
-              </div>
-
-              {advancedMode && (
-                <Alert className="bg-muted/50 mt-1">
-                  <AlertDescription className="text-xs">
-                    <p className="mb-2">Debugging steps for error 3501:</p>
-                    <ol className="list-decimal list-inside space-y-0.5">
-                      <li>Try adding token in URL parameters</li>
-                      <li>Check for trailing slashes in the URL</li>
-                      <li>Verify the token format matches server expectations</li>
-                      <li>Look for specific headers or parameters required by server</li>
-                    </ol>
-                  </AlertDescription>
-                </Alert>
-              )}
-
               {lastError && (
                 <Alert variant="destructive" className="mt-4">
                   <AlertCircle className="h-4 w-4" />
@@ -581,13 +445,7 @@ socket.onmessage = (event) => {
                     {lastError.code === 3501 && (
                       <p className="mt-2">
                         Error 3501 (Bad Request) usually indicates an issue with the connection parameters or token format. 
-                        Try sending the token in URL parameters instead of as a command after connection.
-                      </p>
-                    )}
-                    {lastError.code === 3502 && (
-                      <p className="mt-2">
-                        Error 3502 (Stale) usually indicates that the token has expired or is invalid.
-                        Try generating a new token.
+                        Try a different token or check if the server expects a specific format.
                       </p>
                     )}
                   </AlertDescription>
@@ -634,7 +492,7 @@ socket.onmessage = (event) => {
               
               <Button 
                 onClick={sendAuthentication}
-                disabled={!isConnected || !token || connectionMethod === 'params'}
+                disabled={!isConnected || !token}
                 variant="secondary"
               >
                 Authenticate
@@ -891,38 +749,93 @@ socket.onmessage = (event) => {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              <Tabs defaultValue="conn" onValueChange={(val) => setInfoFormat(val as 'conn' | 'sub' | 'common')}>
-                <TabsList className="mb-4">
-                  <TabsTrigger value="conn">Connection</TabsTrigger>
-                  <TabsTrigger value="sub">Subscription</TabsTrigger>
-                  <TabsTrigger value="common">Error Codes</TabsTrigger>
-                </TabsList>
-                
-                <div className="bg-secondary/20 p-4 rounded-md">
-                  <pre className="text-xs overflow-auto whitespace-pre-wrap">
-                    {getSelectedInfoFormat()}
-                  </pre>
-                </div>
-              </Tabs>
-              
               <div>
                 <h3 className="text-lg font-medium mb-2">Common Error Codes</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Alert>
                     <AlertTitle>Error 3501 (Bad Request)</AlertTitle>
                     <AlertDescription>
-                      This typically means the connection parameters or token format are incorrect. Try sending the token in the URL instead of as a command.
+                      This typically means the connection parameters or token format are incorrect. Ensure your token is properly formatted and has the required claims.
                     </AlertDescription>
                   </Alert>
                   
                   <Alert>
-                    <AlertTitle>Error 3502 (Stale)</AlertTitle>
+                    <AlertTitle>Error 1006 (Abnormal Close)</AlertTitle>
                     <AlertDescription>
-                      The connection was closed because the token is stale, expired or invalid. Try generating a new token with the correct claims.
+                      The connection was closed abnormally, without proper closing handshake. This often indicates network problems or server issues.
                     </AlertDescription>
                   </Alert>
                 </div>
               </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-md font-medium mb-2">Connect Command</h3>
+                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
+                    {`{
+  "id": 1,
+  "method": "connect",
+  "params": {
+    "token": "JWT_TOKEN_HERE"
+  }
+}`}
+                  </pre>
+                </div>
+                
+                <div>
+                  <h3 className="text-md font-medium mb-2">Subscribe Command</h3>
+                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
+                    {`{
+  "id": 2,
+  "method": "subscribe",
+  "params": {
+    "channel": "CHANNEL_NAME"
+  }
+}`}
+                  </pre>
+                </div>
+                
+                <div>
+                  <h3 className="text-md font-medium mb-2">Publish Command</h3>
+                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
+                    {`{
+  "id": 3,
+  "method": "publish",
+  "params": {
+    "channel": "CHANNEL_NAME",
+    "data": {
+      "text": "Your message here"
+    }
+  }
+}`}
+                  </pre>
+                </div>
+                
+                <div>
+                  <h3 className="text-md font-medium mb-2">Ping Command</h3>
+                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
+                    {`{
+  "id": 7,
+  "method": "ping",
+  "params": {}
+}`}
+                  </pre>
+                </div>
+              </div>
+              
+              <Alert className="bg-muted/50">
+                <Code className="h-4 w-4" />
+                <AlertTitle>Troubleshooting Tips</AlertTitle>
+                <AlertDescription>
+                  <ol className="list-decimal list-inside space-y-1 text-sm">
+                    <li>Always send a <strong>connect</strong> command immediately after WebSocket connection is established</li>
+                    <li>Ensure your JWT token is correctly formatted and signed</li>
+                    <li>For connection issues, check that the server URL is correct and accessible</li>
+                    <li>Send periodic <strong>ping</strong> commands to keep the connection alive</li>
+                    <li>Always check response errors by looking for <code className="text-xs bg-muted p-0.5 rounded">data.error</code> in responses</li>
+                  </ol>
+                </AlertDescription>
+              </Alert>
             </div>
           </CardContent>
         </Card>
