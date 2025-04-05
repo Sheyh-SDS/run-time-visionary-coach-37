@@ -16,7 +16,7 @@ import {
   SidebarRail,
   useSidebar
 } from "@/components/ui/sidebar";
-import { Activity, User, Calendar, LineChart, BarChart, Gauge, ChevronRight, ChevronLeft, Flag } from 'lucide-react';
+import { Activity, User, Calendar, LineChart, BarChart, Gauge, ChevronRight, ChevronLeft, Flag, BarChart2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 
@@ -100,6 +100,14 @@ const Sidebar: React.FC = () => {
                   <Link to="/race" className="flex items-center space-x-3">
                     <Flag className="h-5 w-5" />
                     <span>Забег</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Анализ забегов">
+                  <Link to="/race-analysis" className="flex items-center space-x-3">
+                    <BarChart2 className="h-5 w-5" />
+                    <span>Анализ забегов</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

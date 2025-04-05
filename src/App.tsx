@@ -10,6 +10,7 @@ import Sessions from "./pages/Sessions";
 import Simulation from "./pages/Simulation";
 import Statistics from "./pages/Statistics";
 import Race from "./pages/Race";
+import RaceAnalysis from "./pages/RaceAnalysis";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "next-themes";
 import { SimulationProvider } from "./contexts/SimulationContext";
@@ -44,6 +45,7 @@ const App = () => (
                 <Route path="/simulation" element={<Simulation />} />
                 <Route path="/statistics" element={<Statistics />} />
                 <Route path="/race" element={<Race />} />
+                <Route path="/race-analysis" element={<RaceAnalysis />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

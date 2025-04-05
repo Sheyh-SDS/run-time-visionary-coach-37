@@ -9,7 +9,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Activity, User, Calendar, LineChart, BarChart, Gauge, Flag } from 'lucide-react';
+import { Menu, Activity, User, Calendar, LineChart, BarChart, Gauge, Flag, BarChart2 } from 'lucide-react';
 
 const MobileSidebar: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -90,6 +90,14 @@ const MobileSidebar: React.FC = () => {
                 >
                   <Flag className="h-5 w-5" />
                   <span>Забег</span>
+                </Link>
+                <Link 
+                  to="/race-analysis" 
+                  className="flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-secondary w-full"
+                  onClick={() => setOpen(false)}
+                >
+                  <BarChart2 className="h-5 w-5" />
+                  <span>Анализ забегов</span>
                 </Link>
               </div>
             </div>
