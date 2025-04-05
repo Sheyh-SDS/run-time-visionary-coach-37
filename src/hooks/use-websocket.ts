@@ -8,18 +8,23 @@ interface UseWebSocketOptions {
   onMessage?: (message: WebSocketMessage) => void;
   maxReconnectAttempts?: number;
   reconnectInterval?: number;
+  token?: string;
+  debug?: boolean;
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const [connectionState, setConnectionState] = useState<WebSocketState>(
     webSocketService.getState()
   );
+  const [lastError, setLastError] = useState<{ code?: number; reason?: string } | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<number | null>(null);
   const {
     maxReconnectAttempts = 5,
     reconnectInterval = 3000,
-    onMessage
+    onMessage,
+    token,
+    debug = false
   } = options;
 
   // Setup message handler if provided
@@ -30,6 +35,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       // Use the 'on' method to register a general message handler for all message types
       messageUnsubscribe = webSocketService.on('*', (payload) => {
         onMessage({ type: payload.type || 'unknown', payload: payload.payload });
+        
+        if (debug) {
+          console.log('WebSocket received message:', payload);
+        }
       });
     }
     
@@ -38,16 +47,35 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         messageUnsubscribe();
       }
     };
-  }, [onMessage]);
+  }, [onMessage, debug]);
 
   // Register state change handler
   useEffect(() => {
-    const unsubscribeState = webSocketService.onStateChange((state) => {
+    const unsubscribeState = webSocketService.onStateChange((state, error) => {
       setConnectionState(state);
+      
+      if (error) {
+        setLastError(error);
+        
+        if (debug) {
+          console.error('WebSocket error:', error);
+        }
+      } else {
+        setLastError(null);
+      }
       
       // Reset reconnect attempts when connected successfully
       if (state === 'open') {
         reconnectAttemptsRef.current = 0;
+
+        // Authenticate with token if provided
+        if (token && webSocketService.socket) {
+          webSocketService.send('connect', { token });
+          
+          if (debug) {
+            console.log('Sent authentication with token');
+          }
+        }
       }
       
       // Attempt to reconnect on error
@@ -66,18 +94,25 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       
       // If we've exceeded max attempts, give up
       if (reconnectAttemptsRef.current >= maxReconnectAttempts || !options.url) {
-        console.log(`Max reconnect attempts (${maxReconnectAttempts}) reached or no URL provided.`);
+        if (debug) {
+          console.log(`Max reconnect attempts (${maxReconnectAttempts}) reached or no URL provided.`);
+        }
         return;
       }
       
       // Exponential backoff
       const delay = reconnectInterval * Math.pow(1.5, reconnectAttemptsRef.current);
-      console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})...`);
+      
+      if (debug) {
+        console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})...`);
+      }
       
       reconnectTimerRef.current = window.setTimeout(() => {
         reconnectAttemptsRef.current += 1;
         if (options.url) {
-          console.log(`Reconnecting to ${options.url}...`);
+          if (debug) {
+            console.log(`Reconnecting to ${options.url}...`);
+          }
           webSocketService.connect(options.url);
         }
       }, delay);
@@ -95,12 +130,64 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         window.clearTimeout(reconnectTimerRef.current);
       }
     };
-  }, [options.url, options.reconnectOnMount, maxReconnectAttempts, reconnectInterval]);
+  }, [options.url, options.reconnectOnMount, token, maxReconnectAttempts, reconnectInterval, debug]);
 
   // Helper to send a message
   const sendMessage = useCallback((type: string, payload: any): boolean => {
-    return webSocketService.send(type, payload);
-  }, []);
+    const result = webSocketService.send(type, payload);
+    if (debug && !result) {
+      console.error(`Failed to send message of type ${type}`);
+    }
+    return result;
+  }, [debug]);
+
+  // Helper function specifically for Centrifugo commands
+  const sendCentrifugoCommand = useCallback((method: string, params: any, id?: number): boolean => {
+    if (!webSocketService.socket || webSocketService.socket.readyState !== WebSocket.OPEN) {
+      if (debug) {
+        console.error('Cannot send Centrifugo command, WebSocket is not connected');
+      }
+      return false;
+    }
+
+    try {
+      const commandId = id || Math.floor(Math.random() * 1000) + 1;
+      const command = {
+        id: commandId,
+        method,
+        params
+      };
+
+      webSocketService.socket.send(JSON.stringify(command));
+      
+      if (debug) {
+        console.log(`Sent Centrifugo command:`, command);
+      }
+      
+      return true;
+    } catch (error) {
+      if (debug) {
+        console.error('Error sending Centrifugo command:', error);
+      }
+      return false;
+    }
+  }, [debug]);
+
+  // Helper for common Centrifugo operations
+  const centrifugo = {
+    connect: (connectToken: string = token || '') => {
+      return sendCentrifugoCommand('connect', { token: connectToken }, 1);
+    },
+    subscribe: (channelName: string) => {
+      return sendCentrifugoCommand('subscribe', { channel: channelName }, 2);
+    },
+    unsubscribe: (channelName: string) => {
+      return sendCentrifugoCommand('unsubscribe', { channel: channelName }, 3);
+    },
+    publish: (channelName: string, data: any) => {
+      return sendCentrifugoCommand('publish', { channel: channelName, data }, 4);
+    }
+  };
 
   // Helper to register a message handler
   const onMessageType = useCallback((type: string, handler: (payload: any) => void): () => void => {
@@ -111,6 +198,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const connect = useCallback((url?: string) => {
     if (url || options.url) {
       reconnectAttemptsRef.current = 0;
+      setLastError(null);
       webSocketService.connect(url || options.url || '');
     } else {
       console.error('No WebSocket URL provided');
@@ -131,9 +219,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     connectionState,
     isConnected: connectionState === 'open',
     isConnecting: connectionState === 'connecting',
+    lastError,
     sendMessage,
     onMessage: onMessageType,
     connect,
-    disconnect
+    disconnect,
+    centrifugo // New helper for Centrifugo-specific operations
   };
 }

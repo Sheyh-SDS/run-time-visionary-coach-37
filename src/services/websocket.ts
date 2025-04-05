@@ -10,13 +10,21 @@ export interface WebSocketMessage {
   payload: any;
 }
 
+// Error information from WebSocket
+export interface WebSocketError {
+  code?: number;
+  reason?: string;
+  message?: string;
+}
+
 class WebSocketService {
-  private socket: WebSocket | null = null;
+  socket: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private messageHandlers: Record<string, ((payload: any) => void)[]> = {};
-  private stateChangeHandlers: ((state: WebSocketState) => void)[] = [];
+  private stateChangeHandlers: ((state: WebSocketState, error?: WebSocketError) => void)[] = [];
+  private lastError: WebSocketError | null = null;
 
   // Connect to WebSocket server
   connect(url: string): void {
@@ -31,7 +39,10 @@ class WebSocketService {
       this.notifyStateChange('connecting');
     } catch (error) {
       console.error('WebSocket connection error:', error);
-      this.notifyStateChange('error');
+      this.lastError = {
+        message: error instanceof Error ? error.message : 'Unknown connection error'
+      };
+      this.notifyStateChange('error', this.lastError);
       this.attemptReconnect();
     }
   }
@@ -43,12 +54,64 @@ class WebSocketService {
     this.socket.onopen = () => {
       console.log('WebSocket connection established');
       this.reconnectAttempts = 0;
+      this.lastError = null;
       this.notifyStateChange('open');
     };
 
     this.socket.onmessage = (event) => {
       try {
-        const message: WebSocketMessage = JSON.parse(event.data);
+        const data = JSON.parse(event.data);
+        
+        // Handle Centrifugo protocol responses
+        if (data.id !== undefined) {
+          // This is a command response
+          if (data.error) {
+            console.error('Centrifugo error:', data.error);
+            this.lastError = {
+              message: data.error.message || 'Centrifugo error',
+              code: data.error.code
+            };
+            
+            // Notify handlers of the error
+            const errorHandlers = this.messageHandlers['error'] || [];
+            errorHandlers.forEach(handler => {
+              try {
+                handler(data.error);
+              } catch (e) {
+                console.error('Error in error handler:', e);
+              }
+            });
+          }
+          
+          // Notify about specific command responses
+          const commandHandlers = this.messageHandlers[`command:${data.id}`] || [];
+          commandHandlers.forEach(handler => {
+            try {
+              handler(data);
+            } catch (e) {
+              console.error(`Error in command handler for ID ${data.id}:`, e);
+            }
+          });
+        }
+        
+        // Handle Centrifugo push messages
+        if (data.result && data.result.channel && data.result.data) {
+          const channelHandlers = this.messageHandlers[`channel:${data.result.channel}`] || [];
+          channelHandlers.forEach(handler => {
+            try {
+              handler(data.result.data);
+            } catch (e) {
+              console.error(`Error in channel handler for ${data.result.channel}:`, e);
+            }
+          });
+        }
+        
+        // Also create a normalized message for uniform handling
+        const message: WebSocketMessage = {
+          type: data.method || (data.result?.channel ? 'message' : 'response'),
+          payload: data
+        };
+        
         this.handleMessage(message);
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -57,7 +120,13 @@ class WebSocketService {
 
     this.socket.onclose = (event) => {
       console.log(`WebSocket connection closed: ${event.code} ${event.reason}`);
-      this.notifyStateChange('closed');
+      
+      this.lastError = {
+        code: event.code,
+        reason: event.reason
+      };
+      
+      this.notifyStateChange('closed', this.lastError);
       
       if (!event.wasClean) {
         this.attemptReconnect();
@@ -66,7 +135,12 @@ class WebSocketService {
 
     this.socket.onerror = (error) => {
       console.error('WebSocket error:', error);
-      this.notifyStateChange('error');
+      
+      this.lastError = {
+        message: 'WebSocket error event'
+      };
+      
+      this.notifyStateChange('error', this.lastError);
     };
   }
 
@@ -137,8 +211,19 @@ class WebSocketService {
     }
 
     try {
-      const message: WebSocketMessage = { type, payload };
-      this.socket.send(JSON.stringify(message));
+      // Special case for Centrifugo protocol
+      if (type === 'connect' || type === 'subscribe' || type === 'publish' || type === 'unsubscribe') {
+        const id = Math.floor(Math.random() * 1000) + 1;
+        const command = {
+          id,
+          method: type,
+          params: payload
+        };
+        this.socket.send(JSON.stringify(command));
+      } else {
+        const message: WebSocketMessage = { type, payload };
+        this.socket.send(JSON.stringify(message));
+      }
       return true;
     } catch (error) {
       console.error('Error sending WebSocket message:', error);
@@ -161,7 +246,7 @@ class WebSocketService {
   }
 
   // Register a state change handler
-  onStateChange(handler: (state: WebSocketState) => void): () => void {
+  onStateChange(handler: (state: WebSocketState, error?: WebSocketError) => void): () => void {
     this.stateChangeHandlers.push(handler);
     
     // Return a function to unregister this handler
@@ -171,12 +256,12 @@ class WebSocketService {
   }
 
   // Notify all state change handlers
-  private notifyStateChange(state: WebSocketState): void {
+  private notifyStateChange(state: WebSocketState, error?: WebSocketError): void {
     this.stateChangeHandlers.forEach(handler => {
       try {
-        handler(state);
-      } catch (error) {
-        console.error('Error in WebSocket state change handler:', error);
+        handler(state, error);
+      } catch (e) {
+        console.error('Error in WebSocket state change handler:', e);
       }
     });
   }
@@ -206,6 +291,11 @@ class WebSocketService {
       default:
         return 'closed';
     }
+  }
+
+  // Get the last error that occurred
+  getLastError(): WebSocketError | null {
+    return this.lastError;
   }
 
   // Support for Unity WebGL based simulations
