@@ -1,4 +1,4 @@
-import { webSocketService } from './websocket';
+import { WebSocketService, webSocketService } from './websocket';
 import { 
   Athlete, 
   RunSession, 

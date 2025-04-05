@@ -1,5 +1,6 @@
 
-import Centrifuge from 'centrifuge';
+import { useEffect, useState, useCallback } from 'react';
+import * as Centrifuge from 'centrifuge';
 
 export type WebSocketState = 'connecting' | 'open' | 'closed' | 'error';
 
@@ -14,7 +15,7 @@ export interface WebSocketOptions {
 }
 
 export class WebSocketService {
-  private centrifuge: Centrifuge | null = null;
+  private centrifuge: Centrifuge.Centrifuge | null = null;
   private url: string | undefined;
   private onOpen: (() => void) | undefined;
   private onMessage: ((data: any) => void) | undefined;
@@ -23,6 +24,7 @@ export class WebSocketService {
   private onSubscribe: ((channel: string) => void) | undefined;
   private subscriptions: Map<string, any> = new Map();
   private _state: WebSocketState = 'closed';
+  private stateChangeListeners: Array<(state: WebSocketState) => void> = [];
 
   constructor(options: WebSocketOptions) {
     this.url = options.url;
@@ -52,32 +54,37 @@ export class WebSocketService {
 
     this.url = url;
     this._state = 'connecting';
+    this.notifyStateChange();
 
     try {
       // Create a new Centrifuge instance
-      this.centrifuge = new Centrifuge(url);
+      this.centrifuge = new Centrifuge.Centrifuge(url);
 
       this.centrifuge.on('connecting', () => {
         this._state = 'connecting';
         console.log('Centrifugo: Connecting...');
+        this.notifyStateChange();
       });
 
       this.centrifuge.on('connected', () => {
         this._state = 'open';
         console.log('Centrifugo: Connected!');
         if (this.onOpen) this.onOpen();
+        this.notifyStateChange();
       });
 
       this.centrifuge.on('disconnected', () => {
         this._state = 'closed';
         console.log('Centrifugo: Disconnected');
         if (this.onClose) this.onClose();
+        this.notifyStateChange();
       });
 
       this.centrifuge.on('error', (error) => {
         this._state = 'error';
         console.error('Centrifugo error:', error);
         if (this.onError) this.onError(error);
+        this.notifyStateChange();
       });
 
       // Connect to the Centrifugo server
@@ -86,6 +93,7 @@ export class WebSocketService {
       console.error('Failed to create Centrifugo connection:', error);
       this._state = 'error';
       if (this.onError) this.onError(new Event('error'));
+      this.notifyStateChange();
     }
   }
 
@@ -100,6 +108,7 @@ export class WebSocketService {
     this.centrifuge.disconnect();
     this.centrifuge = null;
     this._state = 'closed';
+    this.notifyStateChange();
   }
 
   public subscribe(channel: string, callback?: (data: any) => void): void {
@@ -160,6 +169,39 @@ export class WebSocketService {
 
   public getConnectionId(): string | null {
     return this.centrifuge?.getClientId() || null;
+  }
+
+  // Add the missing methods needed by simulationApi.ts
+
+  public onStateChange(callback: (state: WebSocketState) => void): () => void {
+    this.stateChangeListeners.push(callback);
+    // Return unsubscribe function
+    return () => {
+      this.stateChangeListeners = this.stateChangeListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
+
+  private notifyStateChange(): void {
+    this.stateChangeListeners.forEach(listener => listener(this._state));
+  }
+
+  public send(messageType: string, data: any): void {
+    if (!this.centrifuge || this._state !== 'open') {
+      console.error('Cannot send message - Centrifugo not connected');
+      return;
+    }
+
+    // Use RPC to send a message to the server
+    this.centrifuge.rpc(messageType, data)
+      .then(response => {
+        console.log(`Message sent to Centrifugo (${messageType}):`, data);
+        console.log('Response:', response);
+      })
+      .catch(error => {
+        console.error(`Failed to send message to Centrifugo (${messageType}):`, error);
+      });
   }
 }
 

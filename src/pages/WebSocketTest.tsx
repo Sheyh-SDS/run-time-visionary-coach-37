@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -46,6 +47,7 @@ const WebSocketTest: React.FC = () => {
     subscribe, 
     unsubscribe, 
     publish,
+    send,
     getConnectionId
   } = useWebSocket({
     url: undefined, // We'll connect manually
@@ -171,7 +173,8 @@ const WebSocketTest: React.FC = () => {
 
   // Subscribe to simulation channels
   const handleSubscribeToSimulationChannels = () => {
-    SIMULATION_CHANNELS.forEach(channel => {
+    const channels = simulationApi.getChannels();
+    Object.values(channels).forEach(channel => {
       if (!activeSubscriptions.includes(channel)) {
         subscribe(channel);
         setActiveSubscriptions(prev => [...prev, channel]);

@@ -97,6 +97,17 @@ export function useWebSocket(options: WebSocketOptions) {
   }, []);
 
   /**
+   * Send a message to the server
+   * @param messageType The type of message to send
+   * @param data The data to send
+   */
+  const send = useCallback((messageType: string, data: any) => {
+    if (webSocketRef.current) {
+      webSocketRef.current.send(messageType, data);
+    }
+  }, []);
+
+  /**
    * Get the current connection state
    */
   const getState = useCallback((): WebSocketState => {
@@ -118,6 +129,7 @@ export function useWebSocket(options: WebSocketOptions) {
     subscribe,
     unsubscribe,
     publish,
+    send,
     getState,
     getConnectionId
   };
