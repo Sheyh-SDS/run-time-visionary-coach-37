@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,15 +24,8 @@ const RaceAnalysis = () => {
   const [liveRaceData, setLiveRaceData] = useState(mockLiveRaceData);
   const [isSimulating, setIsSimulating] = useState(false);
   
-  // WebSocket connection
-  const { connectionState, sendMessage, onMessage } = useWebSocket({
-    url: import.meta.env.VITE_CENTRIFUGO_URL || undefined,
-    reconnectOnMount: true,
-    onMessage: (message) => {
-      console.log('Received WebSocket message:', message);
-      handleWebSocketMessage(message);
-    }
-  });
+  // WebSocket state for handling messages
+  const [webSocketMessages, setWebSocketMessages] = useState<any[]>([]);
   
   // State for probability data per athlete
   const [athleteProbabilities, setAthleteProbabilities] = useState<Record<string, {
@@ -45,7 +37,7 @@ const RaceAnalysis = () => {
   
   // Handle WebSocket messages
   const handleWebSocketMessage = (message: any) => {
-    if (message.type === 'position_probabilities' && message.payload.athleteId) {
+    if (message.type === 'position_probabilities' && message.payload?.athleteId) {
       const athleteId = message.payload.athleteId;
       setAthleteProbabilities(prev => ({
         ...prev,
@@ -59,7 +51,7 @@ const RaceAnalysis = () => {
           positionProbabilities: message.payload.probabilities
         }
       }));
-    } else if (message.type === 'top_n_probabilities' && message.payload.athleteId) {
+    } else if (message.type === 'top_n_probabilities' && message.payload?.athleteId) {
       const athleteId = message.payload.athleteId;
       if (message.payload.topN && Array.isArray(message.payload.probabilities)) {
         const topNType = message.payload.topN.join('_');
@@ -96,9 +88,9 @@ const RaceAnalysis = () => {
   // Start race simulation
   const startRace = () => {
     setIsSimulating(true);
-    sendMessage('request_simulation', { type: 'race' });
+    // In a real implementation this would send a message through the WebSocket
+    console.log('Starting race simulation');
     
-    // In a real app, this would connect to a WebSocket or fetch API
     // For now we'll just set the live race data after a delay
     setTimeout(() => {
       setIsSimulating(false);
@@ -134,15 +126,7 @@ const RaceAnalysis = () => {
     });
     
     setAthleteProbabilities(mockProbData);
-    
-    // Subscribe to channels for each athlete
-    if (connectionState === 'open') {
-      liveRaceData.athletes.forEach(athlete => {
-        sendMessage('subscribe', { channel: `athlete:${athlete.athleteId}:probabilities` });
-      });
-      sendMessage('subscribe', { channel: 'race:live' });
-    }
-  }, [connectionState, sendMessage]);
+  }, []);
 
   // Extract all athletes from live race data
   const raceAthletes = liveRaceData?.athletes || [];
@@ -164,6 +148,7 @@ const RaceAnalysis = () => {
     };
   });
 
+  
   return (
     <Layout>
       <div className="space-y-6">
@@ -174,11 +159,11 @@ const RaceAnalysis = () => {
           </p>
         </div>
 
-        {connectionState !== 'open' && (
+        {!isConnected && (
           <Alert className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              {connectionState === 'connecting' ? 'Подключение к серверу...' : 'Нет соединения с сервером данных. Используются демо-данные.'}
+              Нет соединения с сервером данных. Используются демо-данные.
             </AlertDescription>
           </Alert>
         )}

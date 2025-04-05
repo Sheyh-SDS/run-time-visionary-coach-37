@@ -54,6 +54,7 @@ export class WebSocketService {
     this._state = 'connecting';
 
     try {
+      // Create a new Centrifuge instance
       this.centrifuge = new Centrifuge(url);
 
       this.centrifuge.on('connecting', () => {
@@ -161,3 +162,9 @@ export class WebSocketService {
     return this.centrifuge?.getClientId() || null;
   }
 }
+
+// Create a singleton instance
+export const webSocketService = new WebSocketService({
+  url: undefined,
+  reconnectOnMount: false
+});

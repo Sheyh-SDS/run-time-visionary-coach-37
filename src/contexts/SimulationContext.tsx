@@ -78,10 +78,16 @@ export const SimulationProvider: React.FC<{ children: ReactNode }> = ({ children
       console.log('Centrifugo connection established');
       
       // Subscribe to simulation channels on connection
-      const channels = simulationApi.getChannels();
-      Object.values(channels).forEach(channel => {
-        subscribe(channel);
-      });
+      try {
+        const channels = simulationApi.getChannels();
+        Object.values(channels).forEach(channel => {
+          if (typeof channel === 'string') {
+            subscribe(channel);
+          }
+        });
+      } catch (error) {
+        console.error('Error subscribing to channels:', error);
+      }
     }
   });
 

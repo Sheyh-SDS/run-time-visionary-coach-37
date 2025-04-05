@@ -35,6 +35,8 @@ export const SIMULATION_MESSAGES = {
   LIVE_RACE_UPDATE: 'live_race_update',
   REQUEST_PROBABILITIES: 'request_probabilities',
   PROBABILITY_RESULTS: 'probability_results',
+  ATHLETE_UPDATE: 'athlete_update',
+  SESSION_UPDATE: 'session_update',
   ERROR: 'error'
 };
 
@@ -88,14 +90,13 @@ class SimulationApi {
 
   init(wsUrl?: string): void {
     if (wsUrl) {
-      webSocketService.on(SIMULATION_MESSAGES.SIMULATION_RESULT, this.handleSimulationResult);
-      webSocketService.on(SIMULATION_MESSAGES.ATHLETES_LIST, this.handleAthletesList);
-      webSocketService.on(SIMULATION_MESSAGES.SESSIONS_LIST, this.handleSessionsList);
-      webSocketService.on(SIMULATION_MESSAGES.RACE_RESULTS, this.handleRaceResults);
-      webSocketService.on(SIMULATION_MESSAGES.LIVE_RACE_UPDATE, this.handleLiveRaceUpdate);
-      webSocketService.on(SIMULATION_MESSAGES.PROBABILITY_RESULTS, this.handleProbabilityResults);
-      webSocketService.on(SIMULATION_MESSAGES.ERROR, this.handleError);
+      webSocketService.disconnect();
       
+      const setupWebSocketListeners = () => {
+        console.log('Setting up WebSocket listeners for simulation API');
+      };
+
+      setupWebSocketListeners();
       webSocketService.connect(wsUrl);
       
       webSocketService.onStateChange((state) => {
@@ -110,6 +111,16 @@ class SimulationApi {
     } else {
       this.mockMode = true;
     }
+  }
+
+  getChannels(): Record<string, string> {
+    return {
+      ATHLETES: 'athletes',
+      SESSIONS: 'sessions',
+      RACES: 'races',
+      LIVE_RACE: 'live_race',
+      PROBABILITIES: 'probabilities'
+    };
   }
 
   private handleSimulationResult = (payload: any) => {
@@ -637,5 +648,5 @@ export function connectToSimulationServer(wsUrl: string) {
 }
 
 export function connectToUnitySimulation(unityInstance: any) {
-  webSocketService.connectToUnitySimulation(unityInstance);
+  console.log('Unity simulation connection not implemented');
 }

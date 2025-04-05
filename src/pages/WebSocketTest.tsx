@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -11,7 +10,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Wifi, WifiOff, Send, Plus, Trash, RefreshCw, Check } from 'lucide-react';
-import { simulationApi } from '@/services/simulationApi';
+import { simulationApi, SIMULATION_MESSAGES } from '@/services/simulationApi';
+
+const SIMULATION_CHANNELS = [
+  'athletes',
+  'sessions',
+  'races',
+  'live_race',
+  'probabilities'
+];
 
 const WebSocketTest: React.FC = () => {
   const { toast } = useToast();
@@ -162,10 +169,9 @@ const WebSocketTest: React.FC = () => {
     }
   };
 
-  // Subscribe to default channels when connected to simulation channels
+  // Subscribe to simulation channels
   const handleSubscribeToSimulationChannels = () => {
-    const channels = simulationApi.getChannels();
-    Object.values(channels).forEach(channel => {
+    SIMULATION_CHANNELS.forEach(channel => {
       if (!activeSubscriptions.includes(channel)) {
         subscribe(channel);
         setActiveSubscriptions(prev => [...prev, channel]);
