@@ -7,16 +7,15 @@ import { TopNProbability, PositionProbability } from '@/types';
 interface ProbabilityTableProps {
   probabilities: (TopNProbability | PositionProbability)[];
   type: 'position' | 'topn';
+  compact?: boolean;
 }
 
-const ProbabilityTable: React.FC<ProbabilityTableProps> = ({ probabilities, type }) => {
+const ProbabilityTable: React.FC<ProbabilityTableProps> = ({ probabilities, type, compact = false }) => {
   if (!probabilities.length) {
     return (
-      <Card>
-        <CardContent className="p-6 text-center text-muted-foreground">
-          Нет данных о вероятностях
-        </CardContent>
-      </Card>
+      <div className={compact ? "text-center text-sm text-muted-foreground p-2" : "p-6 text-center text-muted-foreground"}>
+        Нет данных о вероятностях
+      </div>
     );
   }
 
@@ -39,6 +38,41 @@ const ProbabilityTable: React.FC<ProbabilityTableProps> = ({ probabilities, type
       }
     }
   };
+
+  if (compact) {
+    return (
+      <div className="text-sm">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b border-border/40">
+              <TableHead className="py-1 px-1">Позиция</TableHead>
+              <TableHead className="text-right py-1 px-1">%</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {probabilities.map((item, index) => {
+              // Get a unique key
+              const key = type === 'position' 
+                ? `pos-${(item as PositionProbability).position}` 
+                : `topn-${(item as TopNProbability).topN.join('-')}`;
+              
+              // Get probability
+              const probability = 'probability' in item ? item.probability : 0;
+              
+              return (
+                <TableRow key={key} className="border-b border-border/20">
+                  <TableCell className="py-1 px-1">{formatPositionDescription(item)}</TableCell>
+                  <TableCell className="text-right font-mono py-1 px-1">
+                    {(probability * 100).toFixed(0)}%
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  }
 
   return (
     <Card>

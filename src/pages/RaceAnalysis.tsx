@@ -18,6 +18,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import RaceResultsTable from '@/components/RaceResultsTable';
+import { ChartContainer } from '@/components/ui/chart';
+import PerformanceChart from '@/components/PerformanceChart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import AthletePerformanceChart from '@/components/AthletePerformanceChart';
 
 const RaceAnalysis = () => {
   const { isConnected } = useSimulation();
@@ -35,27 +39,58 @@ const RaceAnalysis = () => {
     }
   });
   
-  // State for probability data
-  const [positionProbabilities, setPositionProbabilities] = useState<PositionProbability[]>([]);
-  const [top2Probabilities, setTop2Probabilities] = useState<TopNProbability[]>([]);
-  const [top3Probabilities, setTop3Probabilities] = useState<TopNProbability[]>([]);
-  const [top12Probabilities, setTop12Probabilities] = useState<TopNProbability[]>([]);
+  // State for probability data per athlete
+  const [athleteProbabilities, setAthleteProbabilities] = useState<Record<string, {
+    positionProbabilities: PositionProbability[],
+    top2Probabilities: TopNProbability[],
+    top3Probabilities: TopNProbability[],
+    top12Probabilities: TopNProbability[]
+  }>>({});
   
   // Handle WebSocket messages
   const handleWebSocketMessage = (message: any) => {
-    if (message.type === 'position_probabilities') {
-      setPositionProbabilities(message.payload.probabilities);
-    } else if (message.type === 'top_n_probabilities') {
+    if (message.type === 'position_probabilities' && message.payload.athleteId) {
+      const athleteId = message.payload.athleteId;
+      setAthleteProbabilities(prev => ({
+        ...prev,
+        [athleteId]: {
+          ...(prev[athleteId] || {
+            positionProbabilities: [],
+            top2Probabilities: [],
+            top3Probabilities: [],
+            top12Probabilities: []
+          }),
+          positionProbabilities: message.payload.probabilities
+        }
+      }));
+    } else if (message.type === 'top_n_probabilities' && message.payload.athleteId) {
+      const athleteId = message.payload.athleteId;
       if (message.payload.topN && Array.isArray(message.payload.probabilities)) {
         const topNType = message.payload.topN.join('_');
         
-        if (topNType === '1_2') {
-          setTop2Probabilities(message.payload.probabilities);
-        } else if (topNType === '1_2_3') {
-          setTop3Probabilities(message.payload.probabilities);
-        } else if (topNType === '1,2') {
-          setTop12Probabilities(message.payload.probabilities);
-        }
+        setAthleteProbabilities(prev => {
+          const athleteData = prev[athleteId] || {
+            positionProbabilities: [],
+            top2Probabilities: [],
+            top3Probabilities: [],
+            top12Probabilities: []
+          };
+          
+          let updatedData = { ...athleteData };
+          
+          if (topNType === '1_2') {
+            updatedData.top2Probabilities = message.payload.probabilities;
+          } else if (topNType === '1_2_3') {
+            updatedData.top3Probabilities = message.payload.probabilities;
+          } else if (topNType === '1,2') {
+            updatedData.top12Probabilities = message.payload.probabilities;
+          }
+          
+          return {
+            ...prev,
+            [athleteId]: updatedData
+          };
+        });
       }
     } else if (message.type === 'live_race') {
       setLiveRaceData(message.payload);
@@ -76,41 +111,42 @@ const RaceAnalysis = () => {
   
   // Initialize with mock data on mount
   useEffect(() => {
-    // Default position probabilities
-    setPositionProbabilities(
-      mockProbabilityAnalysis[selectedAthleteId]?.positionProbabilities || []
-    );
+    // Create mock data for all athletes
+    const mockProbData = {};
     
-    // Default Top-2 probabilities
-    setTop2Probabilities([
-      { topN: [1, 2], probability: 0.73 }
-    ]);
+    liveRaceData.athletes.forEach(athlete => {
+      mockProbData[athlete.athleteId] = {
+        positionProbabilities: mockProbabilityAnalysis[athlete.athleteId]?.positionProbabilities || [
+          { position: 1, probability: Math.random() * 0.4 + 0.1 },
+          { position: 2, probability: Math.random() * 0.3 + 0.1 },
+          { position: 3, probability: Math.random() * 0.2 + 0.1 },
+          { position: 4, probability: Math.random() * 0.2 + 0.05 },
+          { position: 5, probability: Math.random() * 0.1 + 0.05 },
+          { position: 6, probability: Math.random() * 0.1 }
+        ],
+        top2Probabilities: [
+          { topN: [1, 2], probability: Math.random() * 0.4 + 0.3 }
+        ],
+        top3Probabilities: [
+          { topN: [1, 2, 3], probability: Math.random() * 0.2 + 0.7 }
+        ],
+        top12Probabilities: [
+          { topN: [1], probability: Math.random() * 0.3 + 0.2 },
+          { topN: [2], probability: Math.random() * 0.2 + 0.1 }
+        ]
+      };
+    });
     
-    // Default Top-3 probabilities
-    setTop3Probabilities([
-      { topN: [1, 2, 3], probability: 0.88 }
-    ]);
+    setAthleteProbabilities(mockProbData);
     
-    // Default 1st-2nd place probabilities
-    setTop12Probabilities([
-      { topN: [1], probability: 0.45 },
-      { topN: [2], probability: 0.28 }
-    ]);
-    
-    // Subscribe to channels
+    // Subscribe to channels for each athlete
     if (connectionState === 'open') {
-      sendMessage('subscribe', { channel: `athlete:${selectedAthleteId}:probabilities` });
+      liveRaceData.athletes.forEach(athlete => {
+        sendMessage('subscribe', { channel: `athlete:${athlete.athleteId}:probabilities` });
+      });
       sendMessage('subscribe', { channel: 'race:live' });
     }
-  }, [selectedAthleteId, connectionState, sendMessage]);
-  
-  // Update subscriptions when selected athlete changes
-  useEffect(() => {
-    if (connectionState === 'open') {
-      sendMessage('unsubscribe', { channel: 'athlete:*:probabilities' });
-      sendMessage('subscribe', { channel: `athlete:${selectedAthleteId}:probabilities` });
-    }
-  }, [selectedAthleteId, connectionState, sendMessage]);
+  }, [connectionState, sendMessage]);
 
   // Mock season statistics
   const seasonStats = [
@@ -121,6 +157,23 @@ const RaceAnalysis = () => {
 
   // Extract all athletes from live race data
   const raceAthletes = liveRaceData?.athletes || [];
+
+  // Mock performance data for chart
+  const performanceData = raceAthletes.map(athlete => {
+    return {
+      id: athlete.athleteId,
+      color: athlete.jerseyColor,
+      name: athlete.name,
+      number: athlete.number,
+      data: [
+        { race: 'Race 1', position: Math.floor(Math.random() * 6) + 1 },
+        { race: 'Race 2', position: Math.floor(Math.random() * 6) + 1 },
+        { race: 'Race 3', position: Math.floor(Math.random() * 6) + 1 },
+        { race: 'Race 4', position: Math.floor(Math.random() * 6) + 1 },
+        { race: 'Race 5', position: Math.floor(Math.random() * 6) + 1 }
+      ]
+    };
+  });
 
   return (
     <Layout>
@@ -151,132 +204,128 @@ const RaceAnalysis = () => {
             />
           </div>
           
-          {/* Probability tables section */}
-          <div className="lg:col-span-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-              {/* Position probabilities */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Вероятности позиций</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ProbabilityTable 
-                    probabilities={positionProbabilities}
-                    type="position" 
-                  />
-                </CardContent>
-              </Card>
-              
-              {/* Top-2 probabilities */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Топ-2 вероятности</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ProbabilityTable 
-                    probabilities={top2Probabilities}
-                    type="topn" 
-                  />
-                </CardContent>
-              </Card>
-              
-              {/* Top-3 probabilities */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Топ-3 вероятности</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ProbabilityTable 
-                    probabilities={top3Probabilities}
-                    type="topn" 
-                  />
-                </CardContent>
-              </Card>
-              
-              {/* 1st and 2nd place probabilities */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>1-е и 2-е места</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ProbabilityTable 
-                    probabilities={top12Probabilities}
-                    type="topn" 
-                  />
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          
-          {/* All Athletes Information */}
+          {/* Performance Chart */}
           <div className="lg:col-span-3">
             <Card>
               <CardHeader>
-                <CardTitle>Участники забега</CardTitle>
+                <CardTitle>Динамика результатов</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {raceAthletes.map((athlete) => {
-                    // Find the matching athlete in mockAthletes to get full details
-                    const athleteDetails = mockAthletes.find(a => a.id === athlete.athleteId) || {
-                      id: athlete.athleteId,
-                      name: athlete.name,
-                      age: 0,
-                      gender: 'other' as const,
-                      specialization: [],
-                      personalBests: {},
-                      number: athlete.number,
-                      jerseyColor: athlete.jerseyColor
-                    };
-                    
-                    return (
-                      <Card key={athlete.athleteId} className="overflow-hidden">
-                        <CardContent className="p-4">
-                          <div className="flex items-start space-x-3">
-                            <div 
-                              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 mt-1"
-                              style={{ backgroundColor: athlete.jerseyColor || '#cccccc' }}
-                            >
-                              {athlete.number}
-                            </div>
-                            <div>
-                              <h3 className="font-medium">{athlete.name}</h3>
-                              
-                              <div className="text-sm text-muted-foreground mt-1 space-y-1">
-                                <div>
-                                  <span className="inline-block w-28">Текущая позиция:</span>
-                                  <span className="font-medium">{athlete.currentPosition}</span>
-                                </div>
-                                <div>
-                                  <span className="inline-block w-28">Текущая скорость:</span>
-                                  <span className="font-medium">{athlete.currentSpeed.toFixed(1)} м/с</span>
-                                </div>
-                                <div>
-                                  <span className="inline-block w-28">Пройдено:</span>
-                                  <span className="font-medium">{athlete.currentDistance.toFixed(1)} м</span>
-                                </div>
-                                {athleteDetails.reactionTime !== undefined && (
-                                  <div>
-                                    <span className="inline-block w-28">Реакция:</span>
-                                    <span className="font-medium">{athleteDetails.reactionTime.toFixed(3)} с</span>
-                                  </div>
-                                )}
-                                {athleteDetails.maxSpeed !== undefined && (
-                                  <div>
-                                    <span className="inline-block w-28">Макс. скорость:</span>
-                                    <span className="font-medium">{athleteDetails.maxSpeed.toFixed(1)} м/с</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+              <CardContent className="h-[400px]">
+                <AthletePerformanceChart athletes={performanceData} />
               </CardContent>
             </Card>
+          </div>
+          
+          {/* All Athletes Information with Probability Tables */}
+          <div className="lg:col-span-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {raceAthletes.map((athlete) => {
+                const athleteData = athleteProbabilities[athlete.athleteId] || {
+                  positionProbabilities: [],
+                  top2Probabilities: [],
+                  top3Probabilities: [],
+                  top12Probabilities: []
+                };
+                
+                // Find the matching athlete in mockAthletes to get full details
+                const athleteDetails = mockAthletes.find(a => a.id === athlete.athleteId) || {
+                  id: athlete.athleteId,
+                  name: athlete.name,
+                  age: 0,
+                  gender: 'other' as const,
+                  specialization: [],
+                  personalBests: {},
+                  number: athlete.number,
+                  jerseyColor: athlete.jerseyColor
+                };
+                
+                return (
+                  <Card key={athlete.athleteId} className="overflow-hidden border-t-4" style={{ borderTopColor: athlete.jerseyColor }}>
+                    <CardHeader className="pb-0">
+                      <div className="flex items-center space-x-3">
+                        <div 
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                          style={{ backgroundColor: athlete.jerseyColor }}
+                        >
+                          {athlete.number}
+                        </div>
+                        <CardTitle className="text-lg">{athlete.name}</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {/* Athlete current status */}
+                      <div className="text-sm text-muted-foreground mt-1 space-y-1 mb-4">
+                        <div>
+                          <span className="inline-block w-28">Текущая позиция:</span>
+                          <span className="font-medium">{athlete.currentPosition}</span>
+                        </div>
+                        <div>
+                          <span className="inline-block w-28">Текущая скорость:</span>
+                          <span className="font-medium">{athlete.currentSpeed.toFixed(1)} м/с</span>
+                        </div>
+                        <div>
+                          <span className="inline-block w-28">Пройдено:</span>
+                          <span className="font-medium">{athlete.currentDistance.toFixed(1)} м</span>
+                        </div>
+                        {athleteDetails.reactionTime !== undefined && (
+                          <div>
+                            <span className="inline-block w-28">Реакция:</span>
+                            <span className="font-medium">{athleteDetails.reactionTime.toFixed(3)} с</span>
+                          </div>
+                        )}
+                        {athleteDetails.maxSpeed !== undefined && (
+                          <div>
+                            <span className="inline-block w-28">Макс. скорость:</span>
+                            <span className="font-medium">{athleteDetails.maxSpeed.toFixed(1)} м/с</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Probability tables */}
+                      <div className="space-y-6">
+                        <div>
+                          <h4 className="font-medium mb-2 text-sm">Вероятности позиций</h4>
+                          <ProbabilityTable 
+                            probabilities={athleteData.positionProbabilities}
+                            type="position"
+                            compact={true}
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <h4 className="font-medium mb-2 text-sm">Топ-2</h4>
+                            <ProbabilityTable 
+                              probabilities={athleteData.top2Probabilities}
+                              type="topn"
+                              compact={true}
+                            />
+                          </div>
+                          
+                          <div>
+                            <h4 className="font-medium mb-2 text-sm">Топ-3</h4>
+                            <ProbabilityTable 
+                              probabilities={athleteData.top3Probabilities}
+                              type="topn"
+                              compact={true}
+                            />
+                          </div>
+                          
+                          <div>
+                            <h4 className="font-medium mb-2 text-sm">1-е и 2-е места</h4>
+                            <ProbabilityTable 
+                              probabilities={athleteData.top12Probabilities}
+                              type="topn"
+                              compact={true}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
           
           {/* Season statistics table */}
