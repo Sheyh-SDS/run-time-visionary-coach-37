@@ -37,7 +37,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
+            margin={{ top: 5, right: 30, left: 25, bottom: 50 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#eaeaea" />
             <XAxis 
@@ -45,6 +45,9 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
               tick={{ fontSize: 12 }}
               axisLine={{ stroke: '#e2e8f0' }}
               tickLine={{ stroke: '#e2e8f0' }}
+              height={40}
+              angle={-45}
+              textAnchor="end"
             />
             <YAxis 
               domain={[minTime, maxTime]}
@@ -53,6 +56,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
               axisLine={{ stroke: '#e2e8f0' }}
               tickLine={{ stroke: '#e2e8f0' }}
               yAxisId="left"
+              width={60}
             />
             {sessions.some(s => s.heartRate) && (
               <YAxis 
@@ -61,6 +65,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
                 tick={{ fontSize: 12 }}
                 axisLine={{ stroke: '#e2e8f0' }}
                 tickLine={{ stroke: '#e2e8f0' }}
+                width={35}
               />
             )}
             <Tooltip 

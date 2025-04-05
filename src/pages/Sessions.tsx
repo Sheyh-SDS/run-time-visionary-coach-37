@@ -9,8 +9,42 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import SessionDetail from '@/components/SessionDetail';
 import SplitTimesChart from '@/components/SplitTimesChart';
-import { RunSession } from '@/types';
+import PerformanceParamsCard from '@/components/PerformanceParamsCard';
+import PerformanceParamsChart from '@/components/PerformanceParamsChart';
+import { RunSession, Athlete } from '@/types';
 import { mockAthletes, mockRunSessions, formatTime } from '@/data/mockData';
+
+// Mock performance history data - in a real app, this would come from an API
+const mockPerformanceHistory = [
+  {
+    date: '2024-01-05',
+    reactionTime: 0.23,
+    acceleration: 3.2,
+    maxSpeed: 9.4,
+    deceleration: 2.8
+  },
+  {
+    date: '2024-02-10',
+    reactionTime: 0.21,
+    acceleration: 3.4,
+    maxSpeed: 9.6,
+    deceleration: 2.9
+  },
+  {
+    date: '2024-03-15',
+    reactionTime: 0.20,
+    acceleration: 3.6,
+    maxSpeed: 9.8,
+    deceleration: 3.0
+  },
+  {
+    date: '2024-04-01',
+    reactionTime: 0.19,
+    acceleration: 3.8,
+    maxSpeed: 10.0,
+    deceleration: 3.1
+  }
+];
 
 const Sessions = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -31,11 +65,10 @@ const Sessions = () => {
     return matchesSearch && matchesAthlete;
   });
 
-  // Get athlete name by ID
-  const getAthleteName = (athleteId: string) => {
-    const athlete = mockAthletes.find(a => a.id === athleteId);
-    return athlete ? athlete.name : 'Неизвестный спортсмен';
-  };
+  // Get selected athlete
+  const selectedAthlete = athleteFilter !== 'all' 
+    ? mockAthletes.find(a => a.id === athleteFilter) 
+    : null;
 
   // Sort sessions by date (newest first)
   const sortedSessions = [...filteredSessions].sort(
@@ -140,33 +173,72 @@ const Sessions = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {selectedAthlete && (
+              <PerformanceParamsCard athlete={selectedAthlete} />
+            )}
           </div>
 
           <div className="lg:col-span-2">
-            {selectedSession ? (
-              <Tabs defaultValue="details" className="h-full">
-                <TabsList className="grid grid-cols-2 mb-4">
-                  <TabsTrigger value="details">Детали забега</TabsTrigger>
-                  <TabsTrigger value="splits">Анализ сплитов</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="details" className="m-0">
-                  <SessionDetail session={selectedSession} />
-                </TabsContent>
-                
-                <TabsContent value="splits" className="m-0">
+            <Tabs defaultValue={selectedSession ? "details" : "performance"} className="h-full">
+              <TabsList className="grid grid-cols-3 mb-4">
+                <TabsTrigger value="details" disabled={!selectedSession}>
+                  Детали забега
+                </TabsTrigger>
+                <TabsTrigger value="splits" disabled={!selectedSession}>
+                  Анализ сплитов
+                </TabsTrigger>
+                <TabsTrigger value="performance">Характеристики</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="details" className="m-0">
+                {selectedSession ? (
+                  <SessionDetail 
+                    session={selectedSession} 
+                    athlete={selectedAthlete}
+                  />
+                ) : (
+                  <Card className="h-full">
+                    <CardContent className="flex items-center justify-center h-64">
+                      <div className="text-center text-muted-foreground">
+                        Выберите забег из списка для просмотра деталей
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="splits" className="m-0">
+                {selectedSession ? (
                   <SplitTimesChart session={selectedSession} />
-                </TabsContent>
-              </Tabs>
-            ) : (
-              <Card className="h-full">
-                <CardContent className="flex items-center justify-center h-64">
-                  <div className="text-center text-muted-foreground">
-                    Выберите забег из списка для просмотра деталей
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <Card className="h-full">
+                    <CardContent className="flex items-center justify-center h-64">
+                      <div className="text-center text-muted-foreground">
+                        Выберите забег из списка для просмотра анализа сплитов
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="performance" className="m-0">
+                {selectedAthlete ? (
+                  <PerformanceParamsChart 
+                    data={mockPerformanceHistory} 
+                    athlete={selectedAthlete}
+                  />
+                ) : (
+                  <Card className="h-full">
+                    <CardContent className="flex items-center justify-center h-64">
+                      <div className="text-center text-muted-foreground">
+                        Выберите спортсмена для просмотра динамики характеристик
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
