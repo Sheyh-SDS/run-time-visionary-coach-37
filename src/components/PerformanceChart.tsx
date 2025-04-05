@@ -52,7 +52,17 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
               tick={{ fontSize: 12 }}
               axisLine={{ stroke: '#e2e8f0' }}
               tickLine={{ stroke: '#e2e8f0' }}
+              yAxisId="left"
             />
+            {sessions.some(s => s.heartRate) && (
+              <YAxis 
+                orientation="right"
+                yAxisId="right"
+                tick={{ fontSize: 12 }}
+                axisLine={{ stroke: '#e2e8f0' }}
+                tickLine={{ stroke: '#e2e8f0' }}
+              />
+            )}
             <Tooltip 
               formatter={(value, name) => {
                 if (name === "Время") return formatTime(Number(value));
@@ -70,6 +80,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ sessions, title = "
               strokeWidth={2}
               dot={{ r: 4, strokeWidth: 2 }}
               activeDot={{ r: 6 }}
+              yAxisId="left"
             />
             {sessions.some(s => s.heartRate) && (
               <Line 

@@ -1,0 +1,34 @@
+
+version: '3.8'
+
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    # If you need environment variables
+    environment:
+      - NODE_ENV=production
+    # If you need volumes for persistence
+    # volumes:
+    #   - ./config:/app/config
+    # If you need to connect to other services
+    # depends_on:
+    #   - api
+  
+  # Example API service if needed
+  # api:
+  #   image: your-api-image
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NODE_ENV=production
+  #   volumes:
+  #     - api_data:/data
+  
+# Define volumes if needed
+# volumes:
+#   api_data:
