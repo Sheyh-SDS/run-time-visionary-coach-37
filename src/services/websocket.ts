@@ -25,6 +25,7 @@ class WebSocketService {
   private messageHandlers: Record<string, ((payload: any) => void)[]> = {};
   private stateChangeHandlers: ((state: WebSocketState, error?: WebSocketError) => void)[] = [];
   private lastError: WebSocketError | null = null;
+  private clientId: string | null = null;
 
   // Connect to WebSocket server
   connect(url: string): void {
@@ -61,6 +62,7 @@ class WebSocketService {
     this.socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log('Received WebSocket message:', data);
         
         // Handle Centrifugo protocol responses
         if (data.id !== undefined) {
@@ -72,6 +74,13 @@ class WebSocketService {
               code: data.error.code
             };
             
+            // Show toast for errors
+            toast({
+              title: "WebSocket Error",
+              description: this.lastError.message,
+              variant: "destructive"
+            });
+            
             // Notify handlers of the error
             const errorHandlers = this.messageHandlers['error'] || [];
             errorHandlers.forEach(handler => {
@@ -80,6 +89,18 @@ class WebSocketService {
               } catch (e) {
                 console.error('Error in error handler:', e);
               }
+            });
+          }
+          
+          // Store client ID from connect response
+          if (data.id === 1 && data.result && data.result.client) {
+            this.clientId = data.result.client;
+            console.log('Client ID received:', this.clientId);
+            
+            // Notify connection success
+            toast({
+              title: "WebSocket Connected",
+              description: `Connected with client ID: ${this.clientId}`,
             });
           }
           
@@ -94,7 +115,36 @@ class WebSocketService {
           });
         }
         
-        // Handle Centrifugo push messages
+        // Handle Centrifugo push messages (publications)
+        if (data.push && data.push.channel) {
+          const channel = data.push.channel;
+          const channelData = data.push.data;
+          
+          console.log(`Received message on channel ${channel}:`, channelData);
+          
+          // Notify channel handlers
+          const channelHandlers = this.messageHandlers[`channel:${channel}`] || [];
+          channelHandlers.forEach(handler => {
+            try {
+              handler(channelData);
+            } catch (e) {
+              console.error(`Error in channel handler for ${channel}:`, e);
+            }
+          });
+          
+          // Also create a normalized message
+          const message: WebSocketMessage = {
+            type: 'message',
+            payload: {
+              channel,
+              data: channelData
+            }
+          };
+          
+          this.handleMessage(message);
+        }
+        
+        // Also handle legacy format for backward compatibility
         if (data.result && data.result.channel && data.result.data) {
           const channelHandlers = this.messageHandlers[`channel:${data.result.channel}`] || [];
           channelHandlers.forEach(handler => {
@@ -106,7 +156,7 @@ class WebSocketService {
           });
         }
         
-        // Also create a normalized message for uniform handling
+        // Always create a normalized message for uniform handling
         const message: WebSocketMessage = {
           type: data.method || (data.result?.channel ? 'message' : 'response'),
           payload: data
@@ -127,6 +177,9 @@ class WebSocketService {
       };
       
       this.notifyStateChange('closed', this.lastError);
+      
+      // Reset client ID
+      this.clientId = null;
       
       if (!event.wasClean) {
         this.attemptReconnect();
@@ -213,12 +266,16 @@ class WebSocketService {
     try {
       // Special case for Centrifugo protocol
       if (type === 'connect' || type === 'subscribe' || type === 'publish' || type === 'unsubscribe') {
-        const id = Math.floor(Math.random() * 1000) + 1;
+        let id = Math.floor(Math.random() * 1000) + 1;
+        if (type === 'connect') id = 1; // Always use id=1 for connect for consistency
+        
         const command = {
           id,
           method: type,
           params: payload
         };
+        
+        console.log(`Sending Centrifugo command: ${JSON.stringify(command)}`);
         this.socket.send(JSON.stringify(command));
       } else {
         const message: WebSocketMessage = { type, payload };
@@ -227,6 +284,22 @@ class WebSocketService {
       return true;
     } catch (error) {
       console.error('Error sending WebSocket message:', error);
+      return false;
+    }
+  }
+
+  // Send a raw message (string) to the WebSocket server
+  sendRaw(message: string): boolean {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      console.error('Cannot send message, WebSocket is not connected');
+      return false;
+    }
+
+    try {
+      this.socket.send(message);
+      return true;
+    } catch (error) {
+      console.error('Error sending raw WebSocket message:', error);
       return false;
     }
   }
@@ -277,6 +350,8 @@ class WebSocketService {
       this.socket.close();
       this.socket = null;
     }
+    
+    this.clientId = null;
   }
 
   // Get current WebSocket state
@@ -296,6 +371,26 @@ class WebSocketService {
   // Get the last error that occurred
   getLastError(): WebSocketError | null {
     return this.lastError;
+  }
+
+  // Get client ID if connected
+  getClientId(): string | null {
+    return this.clientId;
+  }
+  
+  // Subscribe to a channel
+  subscribeToChannel(channel: string): boolean {
+    return this.send('subscribe', { channel });
+  }
+  
+  // Publish to a channel
+  publishToChannel(channel: string, data: any): boolean {
+    return this.send('publish', { channel, data });
+  }
+  
+  // Unsubscribe from a channel
+  unsubscribeFromChannel(channel: string): boolean {
+    return this.send('unsubscribe', { channel });
   }
 
   // Support for Unity WebGL based simulations

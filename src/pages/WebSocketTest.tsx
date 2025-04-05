@@ -9,51 +9,44 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Send, PlayCircle, StopCircle, X, Info, AlertCircle } from 'lucide-react';
+import { Loader2, Send, PlayCircle, StopCircle, X, Info, AlertCircle, Code, Download, Copy, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { Toggle } from "@/components/ui/toggle";
 
 const WebSocketTest: React.FC = () => {
+  // WebSocket hook
   const [url, setUrl] = useState('wss://intricately-tenacious-mantis.cloudpub.ru/ws/connection/websocket');
   const [token, setToken] = useState('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SB4MqSE0zFQHWYumo3NGLN11X6pLQkNNhvAqmh6Wtew');
   const [channel, setChannel] = useState('news');
-  const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('simple');
   const [rawMessage, setRawMessage] = useState('');
-  const [errorDetails, setErrorDetails] = useState<{code?: number, reason?: string} | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const clientIdRef = useRef<string | null>(null);
+  const [cmdMethod, setCmdMethod] = useState('subscribe');
+  const [cmdParams, setCmdParams] = useState('');
+  const [debugMode, setDebugMode] = useState(true);
+  const [autoSubscribe, setAutoSubscribe] = useState(false);
+  const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Sample messages for common operations
-  const sampleMessages = {
-    connect: JSON.stringify({
-      id: 1,
-      method: "connect",
-      params: {
-        token: token
-      }
-    }, null, 2),
-    subscribe: JSON.stringify({
-      id: 2,
-      method: "subscribe",
-      params: {
-        channel: channel
-      }
-    }, null, 2),
-    publish: JSON.stringify({
-      id: 3,
-      method: "publish",
-      params: {
-        channel: channel,
-        data: {
-          text: "Hello from WebSocket test!"
-        }
-      }
-    }, null, 2)
-  };
+  // Use the WebSocket hook
+  const { 
+    connectionState, 
+    isConnected,
+    isConnecting,
+    lastError,
+    clientId,
+    connect,
+    disconnect,
+    sendRawMessage,
+    centrifugo
+  } = useWebSocket({
+    debug: debugMode,
+    autoSubscribeChannels: autoSubscribe ? [channel] : [],
+  });
 
   // Add log entry with timestamp
   const addLog = (message: string, isError = false) => {
@@ -63,164 +56,81 @@ const WebSocketTest: React.FC = () => {
     
     if (isError) {
       console.error(logMessage);
-      toast({
-        title: "Error",
-        description: message,
-        variant: "destructive"
-      });
     }
   };
 
+  // Auto-scroll to bottom of logs
+  useEffect(() => {
+    if (logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs]);
+
+  // Log WebSocket state changes
+  useEffect(() => {
+    switch (connectionState) {
+      case 'connecting':
+        addLog('Connecting to WebSocket...');
+        break;
+      case 'open':
+        addLog('WebSocket connection established');
+        break;
+      case 'closed':
+        addLog(`WebSocket connection closed${lastError ? `: code=${lastError.code}, reason=${lastError.reason}` : ''}`);
+        break;
+      case 'error':
+        addLog(`WebSocket error: ${lastError?.message || 'Unknown error'}`, true);
+        break;
+    }
+  }, [connectionState, lastError]);
+
+  // Log client ID when it changes
+  useEffect(() => {
+    if (clientId) {
+      addLog(`Client ID received: ${clientId}`);
+    }
+  }, [clientId]);
+
   const clearLogs = () => {
     setLogs([]);
-    setErrorDetails(null);
   };
 
   const connectWebSocket = () => {
     if (!url) {
       addLog("WebSocket URL is required", true);
+      toast({
+        title: "Error",
+        description: "WebSocket URL is required",
+        variant: "destructive"
+      });
       return;
     }
 
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      addLog("WebSocket is already connected");
+    connect(url);
+  };
+
+  const sendAuthentication = () => {
+    if (!isConnected) {
+      addLog("WebSocket is not connected", true);
       return;
     }
 
-    try {
-      setConnecting(true);
-      setErrorDetails(null);
-      addLog("Connecting to WebSocket...");
-
-      // Create a new WebSocket connection
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
-
-      // WebSocket event handlers
-      ws.onopen = () => {
-        addLog("WebSocket connection established");
-        setConnected(true);
-        setConnecting(false);
-
-        // Send the connect command with token for authentication
-        const connectCommand = {
-          id: 1,
-          method: "connect",
-          params: {
-            token: token
-          }
-        };
-
-        ws.send(JSON.stringify(connectCommand));
-        addLog(`Sent authentication request: ${JSON.stringify(connectCommand)}`);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          addLog(`Received: ${JSON.stringify(data, null, 2)}`);
-          
-          // Check if this is a connect response and store the client ID
-          if (data.id === 1 && data.result && data.result.client) {
-            clientIdRef.current = data.result.client;
-            addLog(`Client ID received: ${clientIdRef.current}`);
-            
-            // Auto-subscribe to channel if we have a channel name
-            if (channel) {
-              subscribeToChannel();
-            }
-          }
-          
-          // Check for error responses
-          if (data.error) {
-            addLog(`Error response: ${data.error.message || 'Unknown error'}`, true);
-          }
-        } catch (error) {
-          addLog(`Error parsing message: ${error}`, true);
-        }
-      };
-
-      ws.onerror = (error) => {
-        addLog(`WebSocket error: ${error}`, true);
-        setConnected(false);
-        setConnecting(false);
-      };
-
-      ws.onclose = (event) => {
-        const closeMessage = `WebSocket connection closed: code=${event.code}, reason=${event.reason}`;
-        addLog(closeMessage);
-        
-        // Set error details for specific error codes
-        if (event.code !== 1000) { // 1000 is normal closure
-          setErrorDetails({
-            code: event.code,
-            reason: event.reason
-          });
-          
-          // Provide more context for common error codes
-          let errorContext = '';
-          switch (event.code) {
-            case 1001:
-              errorContext = 'The server is going down or a browser navigated away from the page.';
-              break;
-            case 1002:
-              errorContext = 'The endpoint is terminating the connection due to a protocol error.';
-              break;
-            case 1003:
-              errorContext = 'The connection is being terminated because it received data of a type it cannot accept.';
-              break;
-            case 1006:
-              errorContext = 'The connection was closed abnormally, without a proper closing handshake.';
-              break;
-            case 1008:
-              errorContext = 'The connection was terminated due to a message that violates the server\'s policy.';
-              break;
-            case 1011:
-              errorContext = 'The server encountered an unexpected condition that prevented it from fulfilling the request.';
-              break;
-            case 3000:
-            case 3001:
-            case 3002:
-            case 3003:
-              errorContext = 'Custom Centrifugo error code. Check server logs for more details.';
-              break;
-            case 3501:
-              errorContext = 'Bad request: The connection parameters might be incorrect or the authentication token is invalid.';
-              break;
-            default:
-              if (event.code >= 4000) {
-                errorContext = 'Application-specific error code.';
-              }
-          }
-          
-          if (errorContext) {
-            addLog(`Error context: ${errorContext}`, true);
-          }
-        }
-        
-        setConnected(false);
-        setConnecting(false);
-        clientIdRef.current = null;
-      };
-
-    } catch (error) {
-      addLog(`Error creating WebSocket: ${error}`, true);
-      setConnecting(false);
+    if (!token) {
+      addLog("Authentication token is required", true);
+      return;
     }
+
+    centrifugo.connect(token);
+    addLog(`Sent authentication with token: ${token}`);
   };
 
   const disconnectWebSocket = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-      clientIdRef.current = null;
-      addLog("WebSocket disconnected");
-      setConnected(false);
-    }
+    disconnect();
+    addLog("WebSocket disconnected");
   };
 
   const subscribeToChannel = () => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (!isConnected) {
       addLog("WebSocket is not connected", true);
       return;
     }
@@ -230,21 +140,12 @@ const WebSocketTest: React.FC = () => {
       return;
     }
 
-    // Send subscribe command
-    const subscribeCommand = {
-      id: 2,
-      method: "subscribe",
-      params: {
-        channel: channel
-      }
-    };
-
-    wsRef.current.send(JSON.stringify(subscribeCommand));
+    centrifugo.subscribe(channel);
     addLog(`Subscribing to channel: ${channel}`);
   };
 
   const sendMessage = () => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (!isConnected) {
       addLog("WebSocket is not connected", true);
       return;
     }
@@ -259,34 +160,146 @@ const WebSocketTest: React.FC = () => {
       try {
         // Try to parse the message as JSON
         const jsonMessage = JSON.parse(message);
-        wsRef.current.send(JSON.stringify(jsonMessage));
+        sendRawMessage(JSON.stringify(jsonMessage));
         addLog(`Sent: ${JSON.stringify(jsonMessage, null, 2)}`);
       } catch (e) {
         // If parsing fails, send as plain text
-        wsRef.current.send(message);
+        sendRawMessage(message);
         addLog(`Sent raw message: ${message}`);
       }
 
       setMessage('');
-    } else {
+    } else if (activeTab === 'raw') {
       if (!rawMessage) {
         addLog("Raw message is empty", true);
         return;
       }
 
       try {
-        wsRef.current.send(rawMessage);
+        sendRawMessage(rawMessage);
         addLog(`Sent raw message: ${rawMessage}`);
       } catch (e) {
         addLog(`Error sending message: ${e}`, true);
       }
+    } else if (activeTab === 'command') {
+      if (!cmdMethod) {
+        addLog("Command method is required", true);
+        return;
+      }
+
+      try {
+        // Parse params if provided
+        let params = {};
+        if (cmdParams) {
+          try {
+            params = JSON.parse(cmdParams);
+          } catch (e) {
+            addLog(`Invalid JSON in parameters: ${e}`, true);
+            return;
+          }
+        }
+
+        // Add channel to params for certain methods
+        if (['subscribe', 'unsubscribe', 'publish', 'presence', 'history'].includes(cmdMethod) && !params.channel) {
+          params = { ...params, channel: channel };
+        }
+
+        centrifugo[cmdMethod as keyof typeof centrifugo]?.(params.channel, params.data);
+        addLog(`Sent ${cmdMethod} command with params: ${JSON.stringify(params)}`);
+      } catch (e) {
+        addLog(`Error sending command: ${e}`, true);
+      }
+    }
+  };
+
+  const sendPing = () => {
+    if (!isConnected) {
+      addLog("WebSocket is not connected", true);
+      return;
+    }
+    
+    centrifugo.ping();
+    addLog("Sent ping command");
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({
+        title: "Copied",
+        description: "Text copied to clipboard",
+      });
+    });
+  };
+
+  // Sample messages for common operations
+  const getSampleMessage = (type: string) => {
+    switch (type) {
+      case 'connect':
+        return JSON.stringify({
+          id: 1,
+          method: "connect",
+          params: {
+            token: token || "JWT_TOKEN_HERE"
+          }
+        }, null, 2);
+      case 'subscribe':
+        return JSON.stringify({
+          id: 2,
+          method: "subscribe",
+          params: {
+            channel: channel || "CHANNEL_NAME"
+          }
+        }, null, 2);
+      case 'publish':
+        return JSON.stringify({
+          id: 3,
+          method: "publish",
+          params: {
+            channel: channel || "CHANNEL_NAME",
+            data: {
+              text: "Hello from WebSocket test!"
+            }
+          }
+        }, null, 2);
+      case 'unsubscribe':
+        return JSON.stringify({
+          id: 4,
+          method: "unsubscribe",
+          params: {
+            channel: channel || "CHANNEL_NAME"
+          }
+        }, null, 2);
+      case 'presence':
+        return JSON.stringify({
+          id: 5,
+          method: "presence",
+          params: {
+            channel: channel || "CHANNEL_NAME"
+          }
+        }, null, 2);
+      case 'history':
+        return JSON.stringify({
+          id: 6,
+          method: "history",
+          params: {
+            channel: channel || "CHANNEL_NAME"
+          }
+        }, null, 2);
+      case 'ping':
+        return JSON.stringify({
+          id: 7,
+          method: "ping",
+          params: {}
+        }, null, 2);
+      default:
+        return "";
     }
   };
 
   const copyToInput = (template: string) => {
     if (activeTab === 'simple') {
       setMessage(template);
-    } else {
+    } else if (activeTab === 'raw') {
       setRawMessage(template);
     }
   };
@@ -294,11 +307,23 @@ const WebSocketTest: React.FC = () => {
   // Clean up WebSocket connection on unmount
   useEffect(() => {
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      disconnect();
     };
-  }, []);
+  }, [disconnect]);
+
+  // Function to save logs to file
+  const saveLogsToFile = () => {
+    const logText = logs.join('\n');
+    const blob = new Blob([logText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `websocket-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <Layout>
@@ -314,22 +339,44 @@ const WebSocketTest: React.FC = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="wsUrl">WebSocket URL</Label>
-                <Input 
-                  id="wsUrl" 
-                  value={url} 
-                  onChange={(e) => setUrl(e.target.value)}
-                  disabled={connected || connecting}
-                />
+                <div className="flex space-x-2">
+                  <Input 
+                    id="wsUrl" 
+                    value={url} 
+                    onChange={(e) => setUrl(e.target.value)}
+                    disabled={isConnected || isConnecting}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copyToClipboard(url)}
+                    title="Copy URL"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="token">Authentication Token</Label>
-                <Input 
-                  id="token" 
-                  value={token} 
-                  onChange={(e) => setToken(e.target.value)}
-                  disabled={connected || connecting}
-                />
+                <div className="flex space-x-2">
+                  <Input 
+                    id="token" 
+                    value={token} 
+                    onChange={(e) => setToken(e.target.value)}
+                    disabled={isConnected}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copyToClipboard(token)}
+                    title="Copy Token"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               
               <div className="space-y-2">
@@ -341,15 +388,36 @@ const WebSocketTest: React.FC = () => {
                   placeholder="Enter channel to subscribe"
                 />
               </div>
+              
+              <div className="flex items-center justify-between space-x-2 pt-2">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="debug-mode"
+                    checked={debugMode}
+                    onCheckedChange={setDebugMode}
+                  />
+                  <Label htmlFor="debug-mode">Debug Mode</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="auto-subscribe"
+                    checked={autoSubscribe}
+                    onCheckedChange={setAutoSubscribe}
+                    disabled={isConnected}
+                  />
+                  <Label htmlFor="auto-subscribe">Auto-subscribe</Label>
+                </div>
+              </div>
 
-              {errorDetails && (
+              {lastError && (
                 <Alert variant="destructive" className="mt-4">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Connection Error</AlertTitle>
                   <AlertDescription>
-                    <p>Code: {errorDetails.code}</p>
-                    <p>Reason: {errorDetails.reason || 'No reason provided'}</p>
-                    {errorDetails.code === 3501 && (
+                    <p>Code: {lastError.code}</p>
+                    <p>Reason: {lastError.reason || 'No reason provided'}</p>
+                    {lastError.code === 3501 && (
                       <p className="mt-2">
                         Error 3501 (Bad Request) usually indicates an issue with the connection parameters or token format. 
                         Try a different token or check if the server expects a specific format.
@@ -358,14 +426,24 @@ const WebSocketTest: React.FC = () => {
                   </AlertDescription>
                 </Alert>
               )}
+              
+              {clientId && (
+                <Alert className="mt-4">
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Connection Info</AlertTitle>
+                  <AlertDescription>
+                    <p>Client ID: {clientId}</p>
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
-            <CardFooter className="flex justify-between">
-              {!connected ? (
+            <CardFooter className="flex flex-wrap gap-2">
+              {!isConnected ? (
                 <Button 
                   onClick={connectWebSocket} 
-                  disabled={connecting || connected}
+                  disabled={isConnecting || isConnected}
                 >
-                  {connecting ? (
+                  {isConnecting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Connecting...
@@ -388,11 +466,28 @@ const WebSocketTest: React.FC = () => {
               )}
               
               <Button 
+                onClick={sendAuthentication}
+                disabled={!isConnected || !token}
+                variant="secondary"
+              >
+                Authenticate
+              </Button>
+              
+              <Button 
                 onClick={subscribeToChannel}
-                disabled={!connected || !channel}
+                disabled={!isConnected || !channel}
                 variant="outline"
               >
-                Subscribe to Channel
+                Subscribe
+              </Button>
+              
+              <Button 
+                onClick={sendPing}
+                disabled={!isConnected}
+                variant="outline"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Ping
               </Button>
             </CardFooter>
           </Card>
@@ -401,20 +496,32 @@ const WebSocketTest: React.FC = () => {
             <CardHeader>
               <CardTitle className="flex justify-between items-center">
                 <span>WebSocket Logs</span>
-                <Badge variant={connected ? "default" : "secondary"}>
-                  {connected ? "Connected" : "Disconnected"}
+                <Badge variant={isConnected ? "default" : "secondary"}>
+                  {connectionState.charAt(0).toUpperCase() + connectionState.slice(1)}
                 </Badge>
               </CardTitle>
               <CardDescription className="flex justify-between items-center">
                 <span>Real-time connection events</span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={clearLogs}
-                  className="h-8"
-                >
-                  <X className="h-4 w-4 mr-1" /> Clear
-                </Button>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={saveLogsToFile}
+                    className="h-8"
+                    title="Download logs"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearLogs}
+                    className="h-8"
+                    title="Clear logs"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -426,18 +533,20 @@ const WebSocketTest: React.FC = () => {
                 ) : (
                   <div className="space-y-1 font-mono text-sm">
                     {logs.map((log, index) => (
-                      <div key={index} className="pb-1">
+                      <div key={index} className={`pb-1 ${log.includes('error') || log.includes('Error') ? 'text-destructive' : ''}`}>
                         {log}
                       </div>
                     ))}
+                    <div ref={logsEndRef} />
                   </div>
                 )}
               </ScrollArea>
             </CardContent>
             <CardFooter className="flex-col">
               <Tabs defaultValue="simple" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsList className="grid w-full grid-cols-3 mb-4">
                   <TabsTrigger value="simple">JSON Message</TabsTrigger>
+                  <TabsTrigger value="command">Centrifugo Command</TabsTrigger>
                   <TabsTrigger value="raw">Raw Message</TabsTrigger>
                 </TabsList>
                 
@@ -448,43 +557,99 @@ const WebSocketTest: React.FC = () => {
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder="Enter JSON message to send"
                       className="font-mono text-sm"
-                      disabled={!connected}
+                      disabled={!isConnected}
                       rows={5}
                     />
                     
-                    <div className="flex justify-between">
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => copyToInput(sampleMessages.connect)}
-                          disabled={!connected}
-                        >
-                          Connect
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => copyToInput(sampleMessages.subscribe)}
-                          disabled={!connected}
-                        >
-                          Subscribe
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => copyToInput(sampleMessages.publish)}
-                          disabled={!connected}
-                        >
-                          Publish
-                        </Button>
-                      </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => copyToInput(getSampleMessage('connect'))}
+                      >
+                        Connect
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => copyToInput(getSampleMessage('subscribe'))}
+                      >
+                        Subscribe
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => copyToInput(getSampleMessage('publish'))}
+                      >
+                        Publish
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => copyToInput(getSampleMessage('unsubscribe'))}
+                      >
+                        Unsubscribe
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => copyToInput(getSampleMessage('ping'))}
+                      >
+                        Ping
+                      </Button>
+                      
+                      <div className="grow"></div>
                       
                       <Button 
                         onClick={sendMessage}
-                        disabled={!connected || !message}
+                        disabled={!isConnected || !message}
                       >
                         <Send className="h-4 w-4 mr-2" /> Send
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="command" className="w-full">
+                  <div className="w-full space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="cmdMethod">Command Method</Label>
+                        <Select value={cmdMethod} onValueChange={setCmdMethod}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="connect">connect</SelectItem>
+                            <SelectItem value="subscribe">subscribe</SelectItem>
+                            <SelectItem value="unsubscribe">unsubscribe</SelectItem>
+                            <SelectItem value="publish">publish</SelectItem>
+                            <SelectItem value="presence">presence</SelectItem>
+                            <SelectItem value="history">history</SelectItem>
+                            <SelectItem value="ping">ping</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cmdParams">Parameters (Optional JSON)</Label>
+                        <Textarea 
+                          id="cmdParams"
+                          value={cmdParams}
+                          onChange={(e) => setCmdParams(e.target.value)}
+                          placeholder='{"key": "value"}'
+                          className="font-mono text-sm"
+                          rows={4}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end">
+                      <Button 
+                        onClick={sendMessage}
+                        disabled={!isConnected}
+                      >
+                        <Send className="h-4 w-4 mr-2" /> Send Command
                       </Button>
                     </div>
                   </div>
@@ -497,14 +662,45 @@ const WebSocketTest: React.FC = () => {
                       onChange={(e) => setRawMessage(e.target.value)}
                       placeholder="Enter raw message to send"
                       className="font-mono text-sm"
-                      disabled={!connected}
+                      disabled={!isConnected}
                       rows={5}
                     />
                     
-                    <div className="flex justify-end">
+                    <div className="flex flex-wrap gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => copyToInput(getSampleMessage('connect'))}
+                      >
+                        Connect
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => copyToInput(getSampleMessage('subscribe'))}
+                      >
+                        Subscribe
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => copyToInput(getSampleMessage('publish'))}
+                      >
+                        Publish
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => copyToInput(getSampleMessage('ping'))}
+                      >
+                        Ping
+                      </Button>
+                      
+                      <div className="grow"></div>
+                      
                       <Button 
                         onClick={sendMessage}
-                        disabled={!connected || !rawMessage}
+                        disabled={!isConnected || !rawMessage}
                       >
                         <Send className="h-4 w-4 mr-2" /> Send Raw
                       </Button>
@@ -520,44 +716,64 @@ const WebSocketTest: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Info className="h-5 w-5 mr-2" />
-              Common Centrifugo Commands
+              Centrifugo WebSocket Protocol Reference
             </CardTitle>
             <CardDescription>
-              Reference for standard Centrifugo WebSocket protocol commands
+              Documentation for standard Centrifugo WebSocket protocol commands and troubleshooting
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6">
               <div>
-                <h3 className="text-md font-medium mb-2">Connect Command</h3>
-                <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
-                  {`{
+                <h3 className="text-lg font-medium mb-2">Common Error Codes</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Alert>
+                    <AlertTitle>Error 3501 (Bad Request)</AlertTitle>
+                    <AlertDescription>
+                      This typically means the connection parameters or token format are incorrect. Ensure your token is properly formatted and has the required claims.
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <Alert>
+                    <AlertTitle>Error 1006 (Abnormal Close)</AlertTitle>
+                    <AlertDescription>
+                      The connection was closed abnormally, without proper closing handshake. This often indicates network problems or server issues.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-md font-medium mb-2">Connect Command</h3>
+                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
+                    {`{
   "id": 1,
   "method": "connect",
   "params": {
     "token": "JWT_TOKEN_HERE"
   }
 }`}
-                </pre>
-              </div>
-              
-              <div>
-                <h3 className="text-md font-medium mb-2">Subscribe Command</h3>
-                <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
-                  {`{
+                  </pre>
+                </div>
+                
+                <div>
+                  <h3 className="text-md font-medium mb-2">Subscribe Command</h3>
+                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
+                    {`{
   "id": 2,
   "method": "subscribe",
   "params": {
     "channel": "CHANNEL_NAME"
   }
 }`}
-                </pre>
-              </div>
-              
-              <div>
-                <h3 className="text-md font-medium mb-2">Publish Command</h3>
-                <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
-                  {`{
+                  </pre>
+                </div>
+                
+                <div>
+                  <h3 className="text-md font-medium mb-2">Publish Command</h3>
+                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
+                    {`{
   "id": 3,
   "method": "publish",
   "params": {
@@ -567,21 +783,34 @@ const WebSocketTest: React.FC = () => {
     }
   }
 }`}
-                </pre>
+                  </pre>
+                </div>
+                
+                <div>
+                  <h3 className="text-md font-medium mb-2">Ping Command</h3>
+                  <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
+                    {`{
+  "id": 7,
+  "method": "ping",
+  "params": {}
+}`}
+                  </pre>
+                </div>
               </div>
               
-              <div>
-                <h3 className="text-md font-medium mb-2">Unsubscribe Command</h3>
-                <pre className="bg-secondary/20 p-3 rounded text-xs overflow-auto">
-                  {`{
-  "id": 4,
-  "method": "unsubscribe",
-  "params": {
-    "channel": "CHANNEL_NAME"
-  }
-}`}
-                </pre>
-              </div>
+              <Alert className="bg-muted/50">
+                <Code className="h-4 w-4" />
+                <AlertTitle>Troubleshooting Tips</AlertTitle>
+                <AlertDescription>
+                  <ol className="list-decimal list-inside space-y-1 text-sm">
+                    <li>Always send a <strong>connect</strong> command immediately after WebSocket connection is established</li>
+                    <li>Ensure your JWT token is correctly formatted and signed</li>
+                    <li>For connection issues, check that the server URL is correct and accessible</li>
+                    <li>Send periodic <strong>ping</strong> commands to keep the connection alive</li>
+                    <li>Always check response errors by looking for <code className="text-xs bg-muted p-0.5 rounded">data.error</code> in responses</li>
+                  </ol>
+                </AlertDescription>
+              </Alert>
             </div>
           </CardContent>
         </Card>
