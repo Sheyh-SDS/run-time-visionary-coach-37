@@ -30,13 +30,16 @@ const Simulation = () => {
     queryFn: simulationApi.getAthletes,
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     retry: 3,
-    onError: (err) => {
-      console.error('Error fetching athletes:', err);
-      toast({
-        title: "Ошибка загрузки",
-        description: "Не удалось загрузить данных спортсменов. Пожалуйста, попробуйте позже.",
-        variant: "destructive"
-      });
+    // Use meta instead of direct onError property
+    meta: {
+      onError: (err: Error) => {
+        console.error('Error fetching athletes:', err);
+        toast({
+          title: "Ошибка загрузки",
+          description: "Не удалось загрузить данных спортсменов. Пожалуйста, попробуйте позже.",
+          variant: "destructive"
+        });
+      }
     }
   });
 

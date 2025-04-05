@@ -1,4 +1,3 @@
-
 import { toast } from "@/hooks/use-toast";
 
 // WebSocket connection states
@@ -74,18 +73,29 @@ class WebSocketService {
   private handleMessage(message: WebSocketMessage): void {
     const { type, payload } = message;
     const handlers = this.messageHandlers[type] || [];
+    const wildcardHandlers = this.messageHandlers['*'] || [];
     
     console.log(`Received WebSocket message of type: ${type}`);
     
-    if (handlers.length === 0) {
+    if (handlers.length === 0 && wildcardHandlers.length === 0) {
       console.warn(`No handlers registered for message type: ${type}`);
     }
 
+    // Call specific handlers for this message type
     handlers.forEach(handler => {
       try {
         handler(payload);
       } catch (error) {
         console.error(`Error in handler for message type ${type}:`, error);
+      }
+    });
+
+    // Also call wildcard handlers
+    wildcardHandlers.forEach(handler => {
+      try {
+        handler(message);
+      } catch (error) {
+        console.error(`Error in wildcard handler for message type ${type}:`, error);
       }
     });
   }

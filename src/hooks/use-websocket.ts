@@ -27,8 +27,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     let messageUnsubscribe: (() => void) | undefined;
     
     if (onMessage) {
-      messageUnsubscribe = webSocketService.onMessage((message) => {
-        onMessage(message);
+      // Use the 'on' method to register a general message handler for all message types
+      messageUnsubscribe = webSocketService.on('*', (payload) => {
+        onMessage({ type: payload.type || 'unknown', payload: payload.payload });
       });
     }
     
