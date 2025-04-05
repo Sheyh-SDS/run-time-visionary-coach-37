@@ -12,6 +12,8 @@ interface UseWebSocketOptions {
   debug?: boolean;
   autoSubscribeChannels?: string[];
   pingInterval?: number;
+  connectionParams?: Record<string, string>;
+  connectWithParams?: boolean;
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
@@ -30,7 +32,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     token,
     debug = false,
     autoSubscribeChannels = [],
-    pingInterval = 25000
+    pingInterval = 25000,
+    connectionParams = {},
+    connectWithParams = false
   } = options;
 
   useEffect(() => {
@@ -101,7 +105,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         reconnectAttemptsRef.current = 0;
         setClientId(webSocketService.getClientId());
 
-        if (token) {
+        // If we should connect with token directly in URL, we don't need to send connect command
+        if (token && !connectWithParams) {
           webSocketService.send('connect', { token });
           
           if (debug) {
@@ -149,13 +154,26 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           if (debug) {
             console.log(`Reconnecting to ${options.url}...`);
           }
-          webSocketService.connect(options.url);
+          
+          // If token should be passed as connection param
+          let connectParams = { ...connectionParams };
+          if (connectWithParams && token) {
+            connectParams.token = token;
+          }
+          
+          webSocketService.connect(options.url, connectParams);
         }
       }, delay);
     };
 
     if (options.url && options.reconnectOnMount) {
-      webSocketService.connect(options.url);
+      // If token should be passed as connection param
+      let connectParams = { ...connectionParams };
+      if (connectWithParams && token) {
+        connectParams.token = token;
+      }
+      
+      webSocketService.connect(options.url, connectParams);
     }
 
     return () => {
@@ -167,7 +185,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         window.clearInterval(pingTimerRef.current);
       }
     };
-  }, [options.url, options.reconnectOnMount, token, maxReconnectAttempts, reconnectInterval, debug, autoSubscribeChannels]);
+  }, [options.url, options.reconnectOnMount, token, maxReconnectAttempts, reconnectInterval, debug, autoSubscribeChannels, connectionParams, connectWithParams]);
 
   const sendMessage = useCallback((type: string, payload: any): boolean => {
     const result = webSocketService.send(type, payload);
@@ -248,11 +266,18 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     if (url || options.url) {
       reconnectAttemptsRef.current = 0;
       setLastError(null);
-      webSocketService.connect(url || options.url || '');
+      
+      // If token should be passed as connection param
+      let connectParams = { ...connectionParams };
+      if (connectWithParams && token) {
+        connectParams.token = token;
+      }
+      
+      webSocketService.connect(url || options.url || '', connectParams);
     } else {
       console.error('No WebSocket URL provided');
     }
-  }, [options.url]);
+  }, [options.url, connectionParams, connectWithParams, token]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimerRef.current !== null) {
