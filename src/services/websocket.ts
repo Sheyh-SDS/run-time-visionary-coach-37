@@ -1,3 +1,4 @@
+
 import { Centrifuge } from 'centrifuge';
 
 export type WebSocketState = 'connecting' | 'open' | 'closed' | 'error';
@@ -162,7 +163,8 @@ export class WebSocketService {
 
   public getConnectionId(): string | null {
     if (!this.centrifuge) return null;
-    return this.centrifuge.id || null;
+    // Access the client ID through the transport property
+    return (this.centrifuge as any).getClientId() || null;
   }
 
   public onStateChange(callback: (state: WebSocketState) => void): () => void {
