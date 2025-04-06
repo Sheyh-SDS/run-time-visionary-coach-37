@@ -1,3 +1,4 @@
+
 import { Centrifuge } from 'centrifuge';
 
 export type WebSocketState = 'connecting' | 'open' | 'closed' | 'error';
@@ -10,11 +11,13 @@ export interface WebSocketOptions {
   onError?: (error: any) => void;
   onSubscribe?: (channel: string) => void;
   reconnectOnMount?: boolean;
+  token?: string; // Add token support for authentication
 }
 
 export class WebSocketService {
   private centrifuge: Centrifuge | null = null;
   private url: string | undefined;
+  private token: string | undefined;
   private onOpen: (() => void) | undefined;
   private onMessage: ((data: any) => void) | undefined;
   private onClose: (() => void) | undefined;
@@ -23,9 +26,12 @@ export class WebSocketService {
   private subscriptions: Map<string, any> = new Map();
   private _state: WebSocketState = 'closed';
   private stateChangeListeners: Array<(state: WebSocketState) => void> = [];
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
 
   constructor(options: WebSocketOptions) {
     this.url = options.url;
+    this.token = options.token;
     this.onOpen = options.onOpen;
     this.onMessage = options.onMessage;
     this.onClose = options.onClose;
@@ -33,7 +39,7 @@ export class WebSocketService {
     this.onSubscribe = options.onSubscribe;
 
     if (this.url && options.reconnectOnMount) {
-      this.connect(this.url);
+      this.connect(this.url, this.token);
     }
   }
 
@@ -45,17 +51,28 @@ export class WebSocketService {
     return this._state === 'open';
   }
 
-  public connect(url: string): void {
+  public connect(url: string, token?: string): void {
     if (this.centrifuge) {
       this.disconnect();
     }
 
     this.url = url;
+    this.token = token;
     this._state = 'connecting';
     this.notifyStateChange();
+    this.reconnectAttempts = 0;
 
     try {
-      this.centrifuge = new Centrifuge(url);
+      const config: any = {
+        debug: true
+      };
+      
+      // Add token if provided
+      if (token) {
+        config.token = token;
+      }
+      
+      this.centrifuge = new Centrifuge(url, config);
 
       this.centrifuge.on('connecting', () => {
         this._state = 'connecting';
@@ -65,6 +82,7 @@ export class WebSocketService {
 
       this.centrifuge.on('connected', () => {
         this._state = 'open';
+        this.reconnectAttempts = 0;
         console.log('Centrifugo: Connected!');
         if (this.onOpen) this.onOpen();
         this.notifyStateChange();
@@ -82,6 +100,20 @@ export class WebSocketService {
         console.error('Centrifugo error:', error);
         if (this.onError) this.onError(error);
         this.notifyStateChange();
+        
+        // Implement reconnection logic
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.reconnectAttempts++;
+          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000);
+          console.log(`Attempting to reconnect in ${delay/1000} seconds (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+          
+          setTimeout(() => {
+            if (this._state !== 'open') {
+              console.log('Reconnecting...');
+              this.centrifuge?.connect();
+            }
+          }, delay);
+        }
       });
 
       this.centrifuge.connect();
@@ -127,7 +159,7 @@ export class WebSocketService {
     subscription.on('publication', (message) => {
       console.log(`Received message on channel ${channel}:`, message);
       if (callback) callback(message.data);
-      if (this.onMessage) this.onMessage(message.data);
+      if (this.onMessage) this.onMessage({...message.data, channel});
     });
 
     subscription.on('error', (error) => {
@@ -193,6 +225,14 @@ export class WebSocketService {
       .catch(error => {
         console.error(`Failed to send message to Centrifugo (${messageType}):`, error);
       });
+  }
+  
+  // Method to set token after initialization
+  public setToken(token: string): void {
+    this.token = token;
+    if (this.centrifuge && this._state === 'open') {
+      (this.centrifuge as any).setToken(token);
+    }
   }
 }
 

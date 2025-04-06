@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,9 +18,11 @@ import { AlertCircle } from 'lucide-react';
 import { ChartContainer } from '@/components/ui/chart';
 import PerformanceChart from '@/components/PerformanceChart';
 import AthletePerformanceChart from '@/components/AthletePerformanceChart';
+import { useToast } from '@/components/ui/use-toast';
 
 const RaceAnalysis = () => {
-  const { isConnected } = useSimulation();
+  const { toast } = useToast();
+  const { isConnected: isSimulationConnected } = useSimulation();
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>(mockAthletes[0]?.id || '');
   const [liveRaceData, setLiveRaceData] = useState(mockLiveRaceData);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -37,6 +40,8 @@ const RaceAnalysis = () => {
   
   // Handle WebSocket messages
   const handleWebSocketMessage = (message: any) => {
+    console.log("Received WebSocket message:", message);
+    
     if (message.type === 'position_probabilities' && message.payload?.athleteId) {
       const athleteId = message.payload.athleteId;
       setAthleteProbabilities(prev => ({
@@ -84,6 +89,50 @@ const RaceAnalysis = () => {
       setLiveRaceData(message.payload);
     }
   };
+  
+  // Initialize WebSocket connection
+  const { 
+    connectionState, 
+    isConnected: isWsConnected, 
+    connect,
+    subscribe 
+  } = useWebSocket({
+    url: undefined, // Connect manually
+    onMessage: handleWebSocketMessage,
+    onOpen: () => {
+      toast({
+        title: "WebSocket подключен",
+        description: "Соединение с сервером данных установлено"
+      });
+      
+      // Subscribe to channels
+      subscribe('live_race');
+      subscribe('probabilities');
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка WebSocket",
+        description: "Не удалось подключиться к серверу данных",
+        variant: "destructive"
+      });
+      console.error("WebSocket error:", error);
+    }
+  });
+  
+  // Connect to WebSocket on page load
+  useEffect(() => {
+    // Get token from URL, localStorage or other source
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const wsUrl = "wss://centrifugo.example.com/connection/websocket";
+    
+    // Connect with token if available
+    if (token) {
+      connect(wsUrl, token);
+    } else {
+      connect(wsUrl);
+    }
+  }, []);
   
   // Start race simulation
   const startRace = () => {
@@ -148,6 +197,8 @@ const RaceAnalysis = () => {
     };
   });
 
+  // Check if either simulation or direct WebSocket is connected
+  const hasConnection = isSimulationConnected || isWsConnected;
   
   return (
     <Layout>
@@ -159,7 +210,7 @@ const RaceAnalysis = () => {
           </p>
         </div>
 
-        {!isConnected && (
+        {!hasConnection && (
           <Alert className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>

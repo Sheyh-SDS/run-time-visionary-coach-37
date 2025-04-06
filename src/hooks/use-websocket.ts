@@ -33,6 +33,11 @@ export function useWebSocket(options: WebSocketOptions) {
     // Create WebSocket service
     webSocketRef.current = new WebSocketService(handlers);
 
+    // Connect immediately if URL provided and reconnectOnMount is true
+    if (options.url && options.reconnectOnMount) {
+      webSocketRef.current.connect(options.url, options.token);
+    }
+
     // Cleanup on unmount
     return () => {
       if (webSocketRef.current) {
@@ -45,11 +50,22 @@ export function useWebSocket(options: WebSocketOptions) {
   /**
    * Connect to a WebSocket server
    * @param url The WebSocket server URL
+   * @param token Optional authentication token
    */
-  const connect = useCallback((url: string) => {
+  const connect = useCallback((url: string, token?: string) => {
     if (webSocketRef.current) {
-      webSocketRef.current.connect(url);
+      webSocketRef.current.connect(url, token);
       setConnectionState('connecting');
+    }
+  }, []);
+
+  /**
+   * Set authentication token
+   * @param token The authentication token
+   */
+  const setToken = useCallback((token: string) => {
+    if (webSocketRef.current) {
+      webSocketRef.current.setToken(token);
     }
   }, []);
 
@@ -126,6 +142,7 @@ export function useWebSocket(options: WebSocketOptions) {
     isConnected,
     connect,
     disconnect,
+    setToken,
     subscribe,
     unsubscribe,
     publish,

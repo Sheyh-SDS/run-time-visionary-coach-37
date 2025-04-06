@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -10,25 +9,19 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Wifi, WifiOff, Send, Plus, Trash, RefreshCw, Check } from 'lucide-react';
+import { Wifi, WifiOff, Send, Plus, Trash, RefreshCw, Check, Key } from 'lucide-react';
 import { simulationApi, SIMULATION_MESSAGES } from '@/services/simulationApi';
-
-const SIMULATION_CHANNELS = [
-  'athletes',
-  'sessions',
-  'races',
-  'live_race',
-  'probabilities'
-];
 
 const WebSocketTest: React.FC = () => {
   const { toast } = useToast();
   const [serverUrl, setServerUrl] = useState('wss://centrifugo.example.com/connection/websocket');
+  const [authToken, setAuthToken] = useState('');
   const [channelName, setChannelName] = useState('test');
   const [messageText, setMessageText] = useState('');
   const [receivedMessages, setReceivedMessages] = useState<{channel: string, data: any, time: string}[]>([]);
   const [activeSubscriptions, setActiveSubscriptions] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('connect');
+  const [useToken, setUseToken] = useState(false);
 
   const handleMessage = (message: any) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -44,6 +37,7 @@ const WebSocketTest: React.FC = () => {
     isConnected, 
     connect, 
     disconnect, 
+    setToken,
     subscribe, 
     unsubscribe, 
     publish,
@@ -75,7 +69,19 @@ const WebSocketTest: React.FC = () => {
     }
   });
 
-  // Handle connection
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      setAuthToken(token);
+      setUseToken(true);
+      toast({
+        title: "Токен получен",
+        description: "Токен авторизации получен из URL",
+      });
+    }
+  }, []);
+
   const handleConnect = () => {
     if (!serverUrl) {
       toast({
@@ -85,16 +91,41 @@ const WebSocketTest: React.FC = () => {
       });
       return;
     }
-    connect(serverUrl);
+    
+    if (useToken && !authToken) {
+      toast({
+        title: "Ошибка",
+        description: "Введите токен авторизации или отключите использование токена",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    connect(serverUrl, useToken ? authToken : undefined);
   };
 
-  // Handle disconnection
+  const handleUpdateToken = () => {
+    if (!authToken) {
+      toast({
+        title: "Ошибка",
+        description: "Введите токен авторизации",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setToken(authToken);
+    toast({
+      title: "Токен обновлен",
+      description: "Токен авторизации был обновлен",
+    });
+  };
+
   const handleDisconnect = () => {
     disconnect();
     setActiveSubscriptions([]);
   };
 
-  // Handle subscription
   const handleSubscribe = () => {
     if (!channelName) {
       toast({
@@ -130,7 +161,6 @@ const WebSocketTest: React.FC = () => {
     });
   };
 
-  // Handle unsubscription
   const handleUnsubscribe = (channel: string) => {
     unsubscribe(channel);
     setActiveSubscriptions(prev => prev.filter(sub => sub !== channel));
@@ -140,7 +170,6 @@ const WebSocketTest: React.FC = () => {
     });
   };
 
-  // Handle message publishing
   const handlePublish = () => {
     if (!activeSubscriptions.length) {
       toast({
@@ -171,7 +200,6 @@ const WebSocketTest: React.FC = () => {
     }
   };
 
-  // Subscribe to simulation channels
   const handleSubscribeToSimulationChannels = () => {
     const channels = simulationApi.getChannels();
     Object.values(channels).forEach(channel => {
@@ -187,12 +215,10 @@ const WebSocketTest: React.FC = () => {
     });
   };
 
-  // Clear message history
   const clearMessages = () => {
     setReceivedMessages([]);
   };
 
-  // Generate connection info
   const connectionInfo = () => {
     if (connectionState === 'open') {
       return {
@@ -259,6 +285,41 @@ const WebSocketTest: React.FC = () => {
                         placeholder="wss://centrifugo.example.com/connection/websocket"
                         disabled={isConnected}
                       />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="auth-token">Токен авторизации</Label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="use-token"
+                            checked={useToken}
+                            onChange={() => setUseToken(!useToken)}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <Label htmlFor="use-token" className="text-xs">Использовать токен</Label>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Input
+                          id="auth-token"
+                          value={authToken}
+                          onChange={(e) => setAuthToken(e.target.value)}
+                          placeholder="JWT токен"
+                          disabled={isConnected || !useToken}
+                          className={useToken ? "" : "opacity-50"}
+                        />
+                        {isConnected && (
+                          <Button 
+                            onClick={handleUpdateToken}
+                            size="icon"
+                            disabled={!useToken}
+                          >
+                            <Key className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     
                     {isConnected ? (
