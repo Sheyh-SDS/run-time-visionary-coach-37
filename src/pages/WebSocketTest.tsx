@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -9,8 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Wifi, WifiOff, Send, Plus, Trash, RefreshCw, Check, Key } from 'lucide-react';
+import { Wifi, WifiOff, Send, Plus, Trash, RefreshCw, Check, Key, Copy, CheckCheck } from 'lucide-react';
 import { simulationApi, SIMULATION_MESSAGES } from '@/services/simulationApi';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const WebSocketTest: React.FC = () => {
   const { toast } = useToast();
@@ -22,6 +24,46 @@ const WebSocketTest: React.FC = () => {
   const [activeSubscriptions, setActiveSubscriptions] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('connect');
   const [useToken, setUseToken] = useState(false);
+  const [jsonFormatted, setJsonFormatted] = useState(true);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [messageTemplate, setMessageTemplate] = useState('custom');
+
+  // Message templates
+  const messageTemplates = {
+    custom: { text: "Custom message" },
+    athleteUpdate: { 
+      type: "athlete_update", 
+      payload: { 
+        athleteId: "athlete-123",
+        name: "John Doe",
+        currentPosition: 2,
+        currentSpeed: 8.5,
+        currentDistance: 50.2
+      }
+    },
+    sessionUpdate: {
+      type: "session_update",
+      payload: {
+        sessionId: "session-456",
+        athleteId: "athlete-123",
+        distance: 100,
+        time: 12.34,
+        date: new Date().toISOString()
+      }
+    },
+    liveRace: {
+      type: "live_race",
+      payload: {
+        raceId: "race-789",
+        status: "running",
+        athletes: [
+          { athleteId: "athlete-123", currentPosition: 1, currentSpeed: 9.1 },
+          { athleteId: "athlete-456", currentPosition: 2, currentSpeed: 8.9 }
+        ],
+        elapsedTime: 15.2
+      }
+    }
+  };
 
   const handleMessage = (message: any) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -181,20 +223,28 @@ const WebSocketTest: React.FC = () => {
     }
 
     try {
-      const messageData = messageText.trim() 
-        ? JSON.parse(messageText) 
-        : { text: "Test message", timestamp: new Date().toISOString() };
+      let messageData;
+      
+      if (messageText.trim()) {
+        try {
+          messageData = JSON.parse(messageText);
+        } catch (e) {
+          // If not valid JSON, send as text string
+          messageData = { text: messageText };
+        }
+      } else {
+        messageData = { text: "Test message", timestamp: new Date().toISOString() };
+      }
       
       publish(activeSubscriptions[0], messageData);
-      setMessageText('');
       toast({
         title: "Сообщение отправлено",
         description: `Сообщение отправлено в канал ${activeSubscriptions[0]}`,
       });
     } catch (error) {
       toast({
-        title: "Ошибка JSON",
-        description: "Проверьте формат сообщения. Требуется валидный JSON.",
+        title: "Ошибка отправки",
+        description: "Не удалось отправить сообщение.",
         variant: "destructive"
       });
     }
@@ -217,6 +267,51 @@ const WebSocketTest: React.FC = () => {
 
   const clearMessages = () => {
     setReceivedMessages([]);
+  };
+
+  const formatJson = () => {
+    try {
+      const jsonObj = JSON.parse(messageText);
+      setMessageText(JSON.stringify(jsonObj, null, 2));
+      setJsonFormatted(true);
+    } catch (e) {
+      toast({
+        title: "Ошибка форматирования",
+        description: "Текст не является валидным JSON",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const minifyJson = () => {
+    try {
+      const jsonObj = JSON.parse(messageText);
+      setMessageText(JSON.stringify(jsonObj));
+      setJsonFormatted(false);
+    } catch (e) {
+      toast({
+        title: "Ошибка минификации",
+        description: "Текст не является валидным JSON",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const copyToClipboard = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleTemplateChange = (value: string) => {
+    setMessageTemplate(value);
+    if (value === 'custom') {
+      return;
+    }
+    
+    const template = messageTemplates[value as keyof typeof messageTemplates];
+    setMessageText(JSON.stringify(template, null, 2));
+    setJsonFormatted(true);
   };
 
   const connectionInfo = () => {
@@ -254,7 +349,7 @@ const WebSocketTest: React.FC = () => {
       <div className="space-y-4">
         <h1 className="text-2xl font-bold tracking-tight">Centrifugo WebSocket Test</h1>
         <p className="text-muted-foreground">
-          Тестирование соединения с Centrifugo и обмена сообщениями по WebSocket
+          Тестирование соединения с Centrifugo и обмена JSON сообщениями по WebSocket
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -272,7 +367,7 @@ const WebSocketTest: React.FC = () => {
                   <TabsList className="grid grid-cols-3 mb-4">
                     <TabsTrigger value="connect">Соединение</TabsTrigger>
                     <TabsTrigger value="subscribe" disabled={!isConnected}>Подписки</TabsTrigger>
-                    <TabsTrigger value="publish" disabled={!isConnected || !activeSubscriptions.length}>Сообщения</TabsTrigger>
+                    <TabsTrigger value="publish" disabled={!isConnected || !activeSubscriptions.length}>JSON</TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="connect" className="space-y-4">
@@ -403,17 +498,41 @@ const WebSocketTest: React.FC = () => {
                   
                   <TabsContent value="publish" className="space-y-4">
                     <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <Label htmlFor="message-text">Сообщение (JSON)</Label>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 px-2 text-xs"
-                          onClick={() => setMessageText(JSON.stringify({ text: "Hello world", timestamp: new Date().toISOString() }, null, 2))}
-                        >
-                          Пример
-                        </Button>
+                      <div className="flex justify-between items-center">
+                        <Label htmlFor="message-template">Шаблон сообщения</Label>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 px-2 text-xs"
+                            onClick={formatJson}
+                          >
+                            Форматировать
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 px-2 text-xs"
+                            onClick={minifyJson}
+                          >
+                            Минифицировать
+                          </Button>
+                        </div>
                       </div>
+                      <Select value={messageTemplate} onValueChange={handleTemplateChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите шаблон" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="custom">Пользовательское сообщение</SelectItem>
+                          <SelectItem value="athleteUpdate">Обновление спортсмена</SelectItem>
+                          <SelectItem value="sessionUpdate">Обновление сессии</SelectItem>
+                          <SelectItem value="liveRace">Обновление гонки</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="message-text">JSON сообщение</Label>
                       <Textarea
                         id="message-text"
                         value={messageText}
@@ -445,7 +564,7 @@ const WebSocketTest: React.FC = () => {
             <Card className="h-full flex flex-col">
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle>Полученные сообщения</CardTitle>
+                  <CardTitle>Полученные JSON сообщения</CardTitle>
                   <Button 
                     variant="ghost" 
                     size="sm"
@@ -464,6 +583,19 @@ const WebSocketTest: React.FC = () => {
                         <div className="flex justify-between text-xs text-muted-foreground mb-1">
                           <div>Канал: <Badge variant="outline">{msg.channel}</Badge></div>
                           <div>{msg.time}</div>
+                        </div>
+                        <div className="flex justify-end mb-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6" 
+                            onClick={() => copyToClipboard(JSON.stringify(msg.data, null, 2), idx)}
+                          >
+                            {copiedIndex === idx ? 
+                              <CheckCheck className="h-3 w-3 text-green-500" /> : 
+                              <Copy className="h-3 w-3" />
+                            }
+                          </Button>
                         </div>
                         <pre className="text-xs font-mono overflow-x-auto p-2 bg-background rounded">
                           {JSON.stringify(msg.data, null, 2)}
