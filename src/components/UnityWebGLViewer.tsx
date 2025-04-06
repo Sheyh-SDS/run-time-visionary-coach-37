@@ -1,8 +1,8 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Rotate3d, Move3d, Scale3d } from 'lucide-react';
 
 interface UnityWebGLViewerProps {
   unityLoaderUrl?: string;
@@ -17,7 +17,7 @@ interface UnityWebGLViewerProps {
 }
 
 const UnityWebGLViewer: React.FC<UnityWebGLViewerProps> = ({
-  unityLoaderUrl = '/UnityLoader.js',
+  unityLoaderUrl = '/Build/UnityLoader.js',
   dataUrl = '/Build/WebGLBuild.data',
   frameworkUrl = '/Build/WebGLBuild.framework.js',
   codeUrl = '/Build/WebGLBuild.wasm',
@@ -30,8 +30,9 @@ const UnityWebGLViewer: React.FC<UnityWebGLViewerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const unityInstanceRef = useRef<any>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'free' | 'follow' | 'top'>('free');
 
   useEffect(() => {
     // Skip initialization if running in a server-side environment
@@ -84,6 +85,19 @@ const UnityWebGLViewer: React.FC<UnityWebGLViewerProps> = ({
         unityInstanceRef.current = unityInstance;
         setIsLoading(false);
         console.log('Unity WebGL initialized successfully');
+        
+        // Setup message handlers for Unity -> React communication
+        window.receiveUnityEvent = (eventName: string, jsonData: string) => {
+          try {
+            const data = JSON.parse(jsonData);
+            console.log('Received event from Unity:', eventName, data);
+            if (onUnityEvent) {
+              onUnityEvent(eventName, data);
+            }
+          } catch (error) {
+            console.error('Error parsing Unity event data:', error);
+          }
+        };
       })
       .catch((error) => {
         console.error('Unity WebGL initialization error:', error);
@@ -99,9 +113,22 @@ const UnityWebGLViewer: React.FC<UnityWebGLViewerProps> = ({
     }
   };
 
-  // Example function to start race simulation
+  // Race control functions
   const startRaceSimulation = () => {
     sendMessageToUnity('SimulationManager', 'StartRaceSimulation', '');
+  };
+  
+  const resetSimulation = () => {
+    sendMessageToUnity('SimulationManager', 'ResetSimulation', '');
+  };
+  
+  const changeCamera = (mode: 'free' | 'follow' | 'top') => {
+    setViewMode(mode);
+    sendMessageToUnity('CameraController', 'SetCameraMode', mode);
+  };
+  
+  const toggleSlowMotion = () => {
+    sendMessageToUnity('SimulationManager', 'ToggleSlowMotion', '');
   };
 
   return (
@@ -123,26 +150,65 @@ const UnityWebGLViewer: React.FC<UnityWebGLViewerProps> = ({
             <div className="bg-destructive/10 text-destructive p-4 rounded-md">
               <p>{error}</p>
               <p className="text-sm mt-2">
-                Убедитесь, что файлы Unity WebGL корректно скопированы в папку public вашего проекта.
+                Убедитесь, что файлы Unity WebGL корректно скопированы в папку public вашего проекта и 
+                имеют структуру: /public/Build/UnityLoader.js, /public/Build/WebGLBuild.data и т.д.
               </p>
             </div>
           ) : (
             <>
-              <canvas 
-                ref={canvasRef}
-                style={{ width, height }}
-                className="bg-background border rounded-md"
-              />
-              <div className="mt-4 flex gap-2">
+              <div className="relative">
+                <canvas 
+                  ref={canvasRef}
+                  style={{ width, height }}
+                  className="bg-background border rounded-md"
+                />
+                
+                {/* Camera controls overlay */}
+                <div className="absolute top-4 right-4 flex flex-col gap-2">
+                  <Button 
+                    size="icon" 
+                    variant={viewMode === 'free' ? "default" : "outline"}
+                    onClick={() => changeCamera('free')}
+                    title="Свободная камера"
+                  >
+                    <Rotate3d className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    size="icon"
+                    variant={viewMode === 'follow' ? "default" : "outline"}
+                    onClick={() => changeCamera('follow')}
+                    title="Следовать за бегуном"
+                  >
+                    <Move3d className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    size="icon"
+                    variant={viewMode === 'top' ? "default" : "outline"}
+                    onClick={() => changeCamera('top')}
+                    title="Вид сверху"
+                  >
+                    <Scale3d className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={startRaceSimulation} disabled={isLoading}>
                   Запустить симуляцию
                 </Button>
                 <Button 
                   variant="outline" 
-                  onClick={() => sendMessageToUnity('SimulationManager', 'ResetSimulation', '')}
+                  onClick={resetSimulation}
                   disabled={isLoading}
                 >
                   Сбросить
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  onClick={toggleSlowMotion}
+                  disabled={isLoading}
+                >
+                  Замедленная съемка
                 </Button>
               </div>
             </>
@@ -157,6 +223,7 @@ const UnityWebGLViewer: React.FC<UnityWebGLViewerProps> = ({
 declare global {
   interface Window {
     createUnityInstance: any;
+    receiveUnityEvent: (eventName: string, jsonData: string) => void;
   }
 }
 
