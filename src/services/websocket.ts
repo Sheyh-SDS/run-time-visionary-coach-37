@@ -1,4 +1,3 @@
-
 import { Centrifuge } from 'centrifuge';
 
 export type WebSocketState = 'connecting' | 'open' | 'closed' | 'error';
@@ -56,7 +55,6 @@ export class WebSocketService {
     this.notifyStateChange();
 
     try {
-      // Create a new Centrifuge instance
       this.centrifuge = new Centrifuge(url);
 
       this.centrifuge.on('connecting', () => {
@@ -86,7 +84,6 @@ export class WebSocketService {
         this.notifyStateChange();
       });
 
-      // Connect to the Centrifugo server
       this.centrifuge.connect();
     } catch (error) {
       console.error('Failed to create Centrifugo connection:', error);
@@ -99,7 +96,6 @@ export class WebSocketService {
   public disconnect(): void {
     if (!this.centrifuge) return;
 
-    // Unsubscribe from all channels
     this.subscriptions.forEach((sub, channel) => {
       this.unsubscribe(channel);
     });
@@ -157,8 +153,6 @@ export class WebSocketService {
       return;
     }
 
-    // This is a client-side publish and may require server-side configuration
-    // to allow client publishing, or you might need to use RPC instead
     this.centrifuge.publish(channel, data).then(() => {
       console.log(`Published to channel ${channel}:`, data);
     }).catch((error) => {
@@ -168,14 +162,11 @@ export class WebSocketService {
 
   public getConnectionId(): string | null {
     if (!this.centrifuge) return null;
-    return this.centrifuge.getClient() ? this.centrifuge.getClient().id : null;
+    return this.centrifuge.id || null;
   }
-
-  // Add missing methods needed by simulationApi.ts
 
   public onStateChange(callback: (state: WebSocketState) => void): () => void {
     this.stateChangeListeners.push(callback);
-    // Return unsubscribe function
     return () => {
       this.stateChangeListeners = this.stateChangeListeners.filter(
         listener => listener !== callback
@@ -193,7 +184,6 @@ export class WebSocketService {
       return;
     }
 
-    // Use RPC to send a message to the server
     this.centrifuge.rpc(messageType, data)
       .then(response => {
         console.log(`Message sent to Centrifugo (${messageType}):`, data);
@@ -205,7 +195,6 @@ export class WebSocketService {
   }
 }
 
-// Create a singleton instance
 export const webSocketService = new WebSocketService({
   url: undefined,
   reconnectOnMount: false
