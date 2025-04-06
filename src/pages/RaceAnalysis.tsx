@@ -19,6 +19,8 @@ import { ChartContainer } from '@/components/ui/chart';
 import PerformanceChart from '@/components/PerformanceChart';
 import AthletePerformanceChart from '@/components/AthletePerformanceChart';
 import { useToast } from '@/components/ui/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import UnityWebGLViewer from '@/components/UnityWebGLViewer';
 
 const RaceAnalysis = () => {
   const { toast } = useToast();
@@ -200,6 +202,19 @@ const RaceAnalysis = () => {
   // Check if either simulation or direct WebSocket is connected
   const hasConnection = isSimulationConnected || isWsConnected;
   
+  // Function to handle Unity events
+  const handleUnityEvent = (eventName: string, data: any) => {
+    console.log('Unity event:', eventName, data);
+    
+    // Handle events from Unity
+    if (eventName === 'race_finished') {
+      toast({
+        title: "Симуляция завершена",
+        description: `Результаты забега: ${data.winner} финишировал первым за ${data.time} секунд`
+      });
+    }
+  };
+  
   return (
     <Layout>
       <div className="space-y-6">
@@ -219,30 +234,87 @@ const RaceAnalysis = () => {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Race visualization */}
-          <div className="lg:col-span-3">
-            <LiveRaceViewer 
-              liveRaceData={liveRaceData}
-              onStartRace={startRace}
-              isSimulating={isSimulating}
+        <Tabs defaultValue="2d" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="2d">2D Визуализация</TabsTrigger>
+            <TabsTrigger value="3d">3D Симуляция</TabsTrigger>
+            <TabsTrigger value="analysis">Подробный анализ</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="2d" className="space-y-6">
+            {/* Race visualization */}
+            <div className="lg:col-span-3">
+              <LiveRaceViewer 
+                liveRaceData={liveRaceData}
+                onStartRace={startRace}
+                isSimulating={isSimulating}
+              />
+            </div>
+            
+            {/* Performance Chart */}
+            <div className="lg:col-span-3">
+              <Card className="overflow-hidden border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg font-medium">Динамика результатов</CardTitle>
+                </CardHeader>
+                <CardContent className="h-[400px]">
+                  <AthletePerformanceChart athletes={performanceData} />
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="3d" className="space-y-6">
+            {/* Unity WebGL Simulation */}
+            <UnityWebGLViewer
+              onUnityEvent={handleUnityEvent}
+              // Customizable props
+              unityLoaderUrl="/Build/UnityLoader.js"
+              dataUrl="/Build/WebGLBuild.data"
+              frameworkUrl="/Build/WebGLBuild.framework.js"
+              codeUrl="/Build/WebGLBuild.wasm"
+              height={500}
             />
-          </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Управление симуляцией</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    3D-симуляция позволяет наблюдать забег с различных ракурсов и в реальном времени.
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 text-sm">
+                    <li>Используйте колесо мыши для приближения/отдаления</li>
+                    <li>Зажмите правую кнопку мыши для вращения камеры</li>
+                    <li>Нажмите пробел для переключения вида камеры</li>
+                    <li>Клавиши 1-6 позволяют переключаться между спортсменами</li>
+                  </ul>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Технические детали</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    Симуляция построена на физическом движке Unity с использованием реальных данных спортсменов.
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 text-sm">
+                    <li>Реалистичная физика движения</li>
+                    <li>Учет индивидуальных характеристик спортсменов</li>
+                    <li>Симуляция реакции на старте и ускорения</li>
+                    <li>Возможность сравнения различных стратегий забега</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
           
-          {/* Performance Chart */}
-          <div className="lg:col-span-3">
-            <Card className="overflow-hidden border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Динамика результатов</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[400px]">
-                <AthletePerformanceChart athletes={performanceData} />
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* All Athletes Information with Probability Tables */}
-          <div className="lg:col-span-3">
+          <TabsContent value="analysis" className="space-y-6">
+            {/* All Athletes Information with Probability Tables */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {raceAthletes.map((athlete) => {
                 const athleteData = athleteProbabilities[athlete.athleteId] || {
@@ -351,8 +423,8 @@ const RaceAnalysis = () => {
                 );
               })}
             </div>
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
